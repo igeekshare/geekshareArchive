@@ -1,0 +1,56 @@
+# Node/Next.js standard .gitignore
+
+# dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# build outputs
+dist/
+build/
+
+# testing
+coverage/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# env files (may contain secrets)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# TypeScript
+*.tsbuildinfo
+
+# linters
+.eslintcache
+
+# IDE/editor
+.vscode/
+.idea/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# deployment/platform
+.vercel/
+.netlify/
+
+# caches
+.turbo/
+.cache/
+
+# misc
+*.swp
+*.swo
+.npmrc
