@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Placeholder favicon for GeekShare.
+  Replace this file with your real favicon at any time (e.g., export your SVG as favicon.svg and overwrite).
+  Primary brand color: #fe4844
+-->
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="GeekShare favicon (placeholder)">
+  <title>GeekShare Favicon (Placeholder)</title>
+  <desc>Rounded square in #fe4844 with a white lightning bolt. Replace with the official icon when available.</desc>
+
+  <!-- Background: red rounded square -->
+  <rect x="32" y="32" width="448" height="448" rx="112" fill="#fe4844"/>
+
+  <!-- Simple white lightning bolt glyph -->
+  <path
+    d="M288 96L200 272h80l-40 144 88-176h-80l40-144Z"
+    fill="#FFFFFF"
+  />
+</svg>
