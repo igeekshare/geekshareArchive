@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg
+  width="1200"
+  height="630"
+  viewBox="0 0 1200 630"
+  xmlns="http://www.w3.org/2000/svg"
+  role="img"
+  aria-label="极客分享（GeekShare）网站社交分享图占位"
+>
+  <title>极客分享 | 优质网站工具APP开源项目每日更新 | @geekshare</title>
+  <desc>
+    Open Graph / Twitter 分享图占位：品牌主色背景、左侧徽记、右侧为标题与标语。
+    尺寸 1200x630，适配常见社交平台卡片展示。
+  </desc>
+
+  <defs>
+    <!-- 轻微噪点/光影渐变，提升质感 -->
+    <linearGradient id="shine" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="0.35" stop-color="#ffffff" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- 顶部装饰性波浪形 -->
+    <linearGradient id="wave" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+
+    <style>
+      .title {
+        font: 800 80px/1.1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+              "Helvetica Neue", Arial, "Noto Sans", "PingFang SC",
+              "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei",
+              "Source Han Sans SC", "Noto Sans CJK SC", sans-serif;
+        letter-spacing: 0.5px;
+      }
+      .tagline {
+        font: 600 34px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+              "Helvetica Neue", Arial, "Noto Sans", "PingFang SC",
+              "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei",
+              "Source Han Sans SC", "Noto Sans CJK SC", sans-serif;
+        letter-spacing: 0.2px;
+      }
+      .meta {
+        font: 500 24px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+              "Helvetica Neue", Arial, "Noto Sans", "PingFang SC",
+              "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei",
+              "Source Han Sans SC", "Noto Sans CJK SC", sans-serif;
+        letter-spacing: 0.2px;
+      }
+    </style>
+  </defs>
+
+  <!-- 品牌主色背景 -->
+  <rect x="0" y="0" width="1200" height="630" fill="#fe4844"/>
+
+  <!-- 顶部淡淡的波浪装饰（提升层次感） -->
+  <path
+    d="M0,0 H1200 V180 C1000,220 800,150 600,190 C400,230 200,160 0,200 Z"
+    fill="url(#wave)"
+    opacity="0.25"
+  />
+
+  <!-- 对角线光影渐变 -->
+  <rect x="0" y="0" width="1200" height="630" fill="url(#shine)"/>
+
+  <!-- 内边距边框（弱化约束框，提升质感） -->
+  <rect
+    x="24" y="24"
+    width="1152" height="582"
+    rx="28"
+    fill="none"
+    stroke="#ffffff"
+    stroke-opacity="0.18"
+    stroke-width="2"
+  />
+
+  <!-- 左侧徽记：白色圆底 + 品牌色闪电 -->
+  <g transform="translate(0, 0)">
+    <circle cx="180" cy="315" r="82" fill="#ffffff" fill-opacity="1"/>
+    <!-- 简化闪电图形：填充品牌色，位于白圆中 -->
+    <path
+      d="M180 230 L145 320 L190 320 L170 400 L225 295 L185 295 Z"
+      fill="#fe4844"
+    />
+  </g>
+
+  <!-- 右侧标题与标语 -->
+  <g transform="translate(0, 0)">
+    <text x="330" y="300" class="title" fill="#ffffff">极客分享</text>
+    <text x="330" y="360" class="tagline" fill="#ffffff" fill-opacity="0.96">
+      优质网站工具APP开源项目每日更新 · @geekshare
+    </text>
+  </g>
+
+  <!-- 右下角域名 -->
+  <text x="1140" y="570" class="meta" fill="#ffffff" fill-opacity="0.9" text-anchor="end">
+    archive.geekshare.org
+  </text>
+</svg>
