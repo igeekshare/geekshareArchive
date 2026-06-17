@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./geekshare.db"
+}
+
+model Channel {
+  id          String    @id
+  slug        String    @unique
+  title       String
+  username    String?   @unique
+  telegramUrl String?
+  archiveUrl  String?
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  messages    Message[]
+  syncLogs    SyncLog[]
+
+  @@map("channels")
+}
+
+model Message {
+  id        String   @id
+  channelId String
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  date      String
+  from      String
+  text      String
+  media     String?
+  replyTo   String?
+  reactions String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([channelId, date])
+  @@index([from])
+  @@index([replyTo])
+  @@map("messages")
+}
+
+model SiteSetting {
+  key         String   @id
+  value       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("site_settings")
+}
+
+model SyncLog {
+  id            String    @id @default(cuid())
+  channelId     String?
+  channel       Channel?  @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  source        String
+  status        String
+  message       String?
+  importedCount Int       @default(0)
+  startedAt     DateTime  @default(now())
+  finishedAt    DateTime?
+
+  @@index([channelId, startedAt])
+  @@index([status])
+  @@map("sync_logs")
+}

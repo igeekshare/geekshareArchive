@@ -6,9 +6,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:generate": "prisma generate",
+    "db:migrate": "node scripts/db-migrate.mjs",
+    "db:studio": "prisma studio",
+    "import:json": "tsx scripts/import-json.ts"
   },
   "dependencies": {
+    "@prisma/client": "^5.22.0",
     "@tanstack/react-virtual": "^3.13.22",
     "clsx": "^2.1.1",
     "lucide-react": "^0.378.0",
@@ -24,8 +29,10 @@
     "eslint": "^8",
     "eslint-config-next": "14.2.3",
     "postcss": "^8",
+    "prisma": "^5.22.0",
     "sharp": "^0.34.5",
     "tailwindcss": "^3.4.1",
+    "tsx": "^4.20.6",
     "typescript": "^5"
   }
 }
