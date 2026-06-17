@@ -192,6 +192,7 @@ async function importMessages(messages: SourceMessage[]): Promise<number> {
             media: serializeJson(message.media),
             replyTo: message.replyTo,
             reactions: serializeJson(message.reactions),
+            status: "published",
           };
 
           return prisma.message.upsert({

@@ -2,39 +2,13 @@ import { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Home as HomeIcon } from "lucide-react";
-import messagesData from "@/data/messages.json";
 import MessageCard from "@/components/MessageCard";
-
-// Define message types locally to avoid import circularity if any
-interface Reaction {
-  emoji: string;
-  count: string;
-}
-
-interface Media {
-  type: "photo" | "video" | "file";
-  url: string;
-  thumb?: string;
-  width?: string;
-  height?: string;
-  title?: string;
-  description?: string;
-}
-
-interface Message {
-  id: string;
-  date: string;
-  from: string;
-  text: string;
-  media?: Media | null;
-  replyTo?: string | null;
-  reactions?: Reaction[] | null;
-}
-
-const allMessages = messagesData as Message[];
+import { getMessageById, getPublicMessages } from "@/lib/messages";
 
 // Static Generation: Tell Next.js which paths to pre-render
 export async function generateStaticParams() {
+  const allMessages = await getPublicMessages();
+
   return allMessages.map((msg) => ({
     id: msg.id,
   }));
@@ -42,7 +16,7 @@ export async function generateStaticParams() {
 
 // SEO Metadata
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const message = allMessages.find((m) => m.id === params.id);
+  const message = await getMessageById(params.id);
 
   if (!message) {
     return {
@@ -65,8 +39,8 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   };
 }
 
-export default function MessagePage({ params }: { params: { id: string } }) {
-  const message = allMessages.find((m) => m.id === params.id);
+export default async function MessagePage({ params }: { params: { id: string } }) {
+  const message = await getMessageById(params.id);
 
   if (!message) {
     notFound();
