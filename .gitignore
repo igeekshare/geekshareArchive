@@ -31,6 +31,12 @@ lerna-debug.log*
 # TypeScript
 *.tsbuildinfo
 
+# local databases
+prisma/*.db
+prisma/*.db-journal
+prisma/*.db-wal
+prisma/*.db-shm
+
 # linters
 .eslintcache
 
