@@ -52,6 +52,7 @@ const DEFAULT_CHANNEL_DATA = {
 
 const JSON_PATH = path.join(process.cwd(), "src", "data", "messages.json");
 const BATCH_SIZE = 100;
+const TAG_REGEX = /#([A-Za-z0-9_\u4e00-\u9fa5]+)/g;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -149,6 +150,28 @@ function serializeJson(
   return value === null ? null : JSON.stringify(value);
 }
 
+function getTelegramMessageId(id: string): string {
+  return id.replace(/^message/, "");
+}
+
+function extractTags(text: string): string[] {
+  const tags = new Set<string>();
+  let match: RegExpExecArray | null;
+
+  TAG_REGEX.lastIndex = 0;
+  while ((match = TAG_REGEX.exec(text)) !== null) {
+    const tag = match[1].trim();
+    if (tag) tags.add(tag);
+  }
+
+  return Array.from(tags);
+}
+
+function serializeTags(text: string): string | null {
+  const tags = extractTags(text);
+  return tags.length > 0 ? JSON.stringify(tags) : null;
+}
+
 async function loadMessages(): Promise<SourceMessage[]> {
   const raw = await readFile(JSON_PATH, "utf8");
   const parsed: unknown = JSON.parse(raw);
@@ -173,6 +196,8 @@ async function importMessages(messages: SourceMessage[]): Promise<number> {
       source: path.relative(process.cwd(), JSON_PATH).replace(/\\/g, "/"),
       status: "running",
       importedCount: 0,
+      updatedCount: 0,
+      skippedCount: 0,
     },
   });
 
@@ -186,12 +211,16 @@ async function importMessages(messages: SourceMessage[]): Promise<number> {
         batch.map((message) => {
           const data = {
             channelId: channel.id,
+            telegramMessageId: getTelegramMessageId(message.id),
+            sourceUrl: `https://t.me/${DEFAULT_CHANNEL.username}/${getTelegramMessageId(message.id)}`,
             date: message.date,
+            datetime: null,
             from: message.from,
             text: message.text,
             media: serializeJson(message.media),
             replyTo: message.replyTo,
             reactions: serializeJson(message.reactions),
+            tags: serializeTags(message.text),
             status: "published",
           };
 

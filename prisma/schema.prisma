@@ -24,23 +24,28 @@ model Channel {
 }
 
 model Message {
-  id        String   @id
-  channelId String
-  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  date      String
-  from      String
-  text      String
-  media     String?
-  replyTo   String?
-  reactions String?
-  status    String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String   @id
+  channelId         String
+  channel           Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  telegramMessageId String?
+  sourceUrl         String?
+  date              String
+  datetime          String?
+  from              String
+  text              String
+  media             String?
+  replyTo           String?
+  reactions         String?
+  tags              String?
+  status            String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@index([channelId, date])
   @@index([from])
   @@index([replyTo])
   @@index([status])
+  @@unique([channelId, telegramMessageId])
   @@map("messages")
 }
 
@@ -61,7 +66,10 @@ model SyncLog {
   source        String
   status        String
   message       String?
+  errorMessage  String?
   importedCount Int       @default(0)
+  updatedCount  Int       @default(0)
+  skippedCount  Int       @default(0)
   startedAt     DateTime  @default(now())
   finishedAt    DateTime?
 

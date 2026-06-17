@@ -10,11 +10,13 @@
     "db:generate": "prisma generate",
     "db:migrate": "node scripts/db-migrate.mjs",
     "db:studio": "prisma studio",
-    "import:json": "tsx scripts/import-json.ts"
+    "import:json": "tsx scripts/import-json.ts",
+    "sync:channel": "tsx scripts/sync-channel.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "@tanstack/react-virtual": "^3.13.22",
+    "cheerio": "^1.1.2",
     "clsx": "^2.1.1",
     "lucide-react": "^0.378.0",
     "next": "14.2.3",
