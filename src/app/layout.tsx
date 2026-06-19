@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import FloatingTabBar from "@/components/FloatingTabBar";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -81,11 +80,7 @@ export default function RootLayout({
       <body
         className={`${inter.className} antialiased bg-zinc-50 dark:bg-[#0a0a0a] text-zinc-900 dark:text-zinc-100`}
       >
-        <main className="min-h-screen max-w-4xl mx-auto px-4 py-8">
-          {children}
-        </main>
-
-        <FloatingTabBar />
+        {children}
       </body>
     </html>
   );
