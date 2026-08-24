@@ -1,6 +1,7 @@
 import { Archive, Hash, RadioTower } from "lucide-react";
 import type { HomepageStats } from "@/lib/messages";
 import type { PublicBrandingSettings } from "@/lib/site-config";
+import AnimatedNumber from "@/components/AnimatedNumber";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function HomepageHero({
@@ -28,11 +29,11 @@ export default function HomepageHero({
           <Skeleton className="h-8 w-52 bg-white/10" />
         ) : (
           <>
-            <span className="inline-flex items-center gap-1.5"><Archive className="size-3.5 text-blue-400" />{stats?.messageCount.toLocaleString("zh-CN") ?? 0} 条</span>
+            <span className="inline-flex items-center gap-1.5"><Archive className="size-3.5 text-blue-400" /><AnimatedNumber value={stats?.messageCount ?? 0} /> 条</span>
             <span className="h-3 w-px bg-white/15" aria-hidden="true" />
-            <span className="inline-flex items-center gap-1.5"><Hash className="size-3.5 text-red-400" />{stats?.tagCount.toLocaleString("zh-CN") ?? 0} 个话题</span>
+            <span className="inline-flex items-center gap-1.5"><Hash className="size-3.5 text-red-400" /><AnimatedNumber value={stats?.tagCount ?? 0} /> 个话题</span>
             <span className="h-3 w-px bg-white/15" aria-hidden="true" />
-            <span className="inline-flex items-center gap-1.5"><RadioTower className="size-3.5 text-blue-400" />{stats?.channelCount.toLocaleString("zh-CN") ?? 0} 个频道</span>
+            <span className="inline-flex items-center gap-1.5"><RadioTower className="size-3.5 text-blue-400" /><AnimatedNumber value={stats?.channelCount ?? 0} /> 个频道</span>
           </>
         )}
       </div>

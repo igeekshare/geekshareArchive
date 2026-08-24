@@ -41,6 +41,7 @@
     "sync:channel": "tsx scripts/sync-channel.ts"
   },
   "dependencies": {
+    "@number-flow/react": "^0.6.2",
     "@radix-ui/react-avatar": "^1.2.6",
     "@radix-ui/react-dialog": "^1.1.23",
     "@radix-ui/react-dropdown-menu": "^2.1.24",
