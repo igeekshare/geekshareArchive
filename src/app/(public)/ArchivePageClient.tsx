@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowUp, LoaderCircle, Search, X } from "lucide-react";
+import AnimatedNumber from "@/components/AnimatedNumber";
 import SiteHeader from "@/components/SiteHeader";
 import MessageCard from "@/components/MessageCard";
 import ArchiveToolbar from "@/components/home/ArchiveToolbar";
@@ -53,6 +54,7 @@ export default function ArchivePageClient() {
   const [total, setTotal] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasLoadedMessages, setHasLoadedMessages] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [homepageLoading, setHomepageLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -126,6 +128,7 @@ export default function ArchivePageClient() {
         setMessages(data.items);
         setTotal(data.total);
         setNextCursor(data.nextCursor);
+        setHasLoadedMessages(true);
         if (restoreState && !restoredRef.current) {
           restoredRef.current = true;
           window.requestAnimationFrame(() => window.requestAnimationFrame(() => window.scrollTo({ top: restoreState.scrollY, behavior: "auto" })));
@@ -225,7 +228,13 @@ export default function ArchivePageClient() {
             <div className="mb-3 flex min-h-8 items-end justify-between gap-3 px-1">
               <div>
                 <h2 className="text-lg font-extrabold">{sort === "hot" ? "本周热门" : sort === "featured" ? "编辑精选" : sort === "oldest" ? "从最早开始" : "最新内容"}</h2>
-                {!loading && <p className="mt-0.5 text-xs text-muted-foreground">共 {total.toLocaleString("zh-CN")} 条内容</p>}
+                {hasLoadedMessages ? (
+                  <p className={`mt-0.5 text-xs text-muted-foreground transition-opacity motion-reduce:transition-none ${loading ? "opacity-55" : "opacity-100"}`} aria-busy={loading} aria-live="polite">
+                    共 <AnimatedNumber value={total} /> 条内容
+                  </p>
+                ) : loading ? (
+                  <Skeleton className="mt-1 h-3 w-20" />
+                ) : null}
               </div>
               {filtersActive && <Button variant="ghost" size="sm" onClick={clearAll} className="text-muted-foreground"><X />清除条件</Button>}
             </div>

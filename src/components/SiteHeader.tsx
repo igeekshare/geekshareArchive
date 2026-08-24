@@ -104,7 +104,7 @@ export default function SiteHeader({ searchValue, onSearchChange, onSearchSubmit
   };
 
   return (
-    <header className={cn("sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85", className)}>
+    <header className={cn("site-header sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85", className)}>
       <div className="mx-auto flex h-[60px] max-w-[1276px] items-center gap-5 px-4 min-[1300px]:px-0">
         <a href="/" className="flex shrink-0 items-center gap-2.5" aria-label={`${siteName}首页`}>
           {branding?.logoUrl ? <img src={branding.logoUrl} alt="" className="size-9 rounded-md object-contain" /> : <span className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-red-400 to-red-600 text-base font-bold text-white shadow-sm">{initial}</span>}

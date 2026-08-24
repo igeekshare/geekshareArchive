@@ -2,6 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
+@view-transition {
+  navigation: auto;
+}
+
+@keyframes page-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+::view-transition-old(root) {
+  animation: 120ms ease-out both page-fade-out;
+}
+
+::view-transition-new(root) {
+  animation: 160ms cubic-bezier(0.16, 1, 0.3, 1) both page-fade-in;
+}
+
+::view-transition-group(site-header) {
+  z-index: 50;
+  animation: none;
+}
+
+::view-transition-old(site-header) {
+  display: none;
+}
+
+::view-transition-new(site-header) {
+  animation: none;
+}
+
 :root {
   --background: 220 20% 98%;
   --foreground: 222 32% 10%;
@@ -24,6 +61,7 @@
   --ring: 359 72% 51%;
   --telegram: 216 82% 46%;
   --radius: 0.65rem;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   --tg-theme-bg-color: #ffffff;
   --tg-theme-text-color: #000000;
   --tg-theme-hint-color: #999999;
@@ -85,6 +123,13 @@ html {
   .animate-pulse {
     animation: none !important;
   }
+
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
 }
 
 body {
@@ -92,6 +137,10 @@ body {
   background: hsl(var(--background));
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   min-width: 320px;
+}
+
+.site-header {
+  view-transition-name: site-header;
 }
 
 ::selection {
@@ -214,6 +263,48 @@ textarea {
 
   .message-reading-body br {
     line-height: 2;
+  }
+
+  .message-reading-body strong {
+    color: hsl(var(--foreground));
+    font-weight: 700;
+  }
+
+  .message-reading-body s {
+    color: hsl(var(--muted-foreground));
+    text-decoration-thickness: 1px;
+  }
+
+  .message-reading-body :not(pre) > code {
+    border: 1px solid hsl(var(--border));
+    border-radius: calc(var(--radius) - 4px);
+    background: hsl(var(--muted));
+    padding: 0.12em 0.38em;
+    color: hsl(var(--foreground));
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+  }
+
+  .message-reading-body pre {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    margin-block: 1rem;
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.65rem;
+    background: hsl(222 30% 7%);
+    padding: 0.875rem 1rem;
+    color: hsl(210 20% 96%);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.65;
+    tab-size: 2;
+  }
+
+  .message-reading-body pre code {
+    color: inherit;
+    font: inherit;
+    white-space: pre;
   }
 
   .message-reading-body img,
