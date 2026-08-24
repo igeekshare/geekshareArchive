@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CheckCircle2, ImageUp, Loader2, RotateCcw, Save } from "lucide-react";
+import { ImageUp, Loader2, RotateCcw, Save } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { adminRequestJson as requestJson } from "@/lib/admin-api";
@@ -27,7 +28,7 @@ export default function SiteSettingsForm() {
   const [draft, setDraft] = useState<Pick<SiteSettings, "siteName" | "homepageTitle" | "description"> | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
-  const [notice, setNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [notice, setNotice] = useState<{ tone: "error"; text: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -55,7 +56,7 @@ export default function SiteSettingsForm() {
     if (syncDraft) {
       setDraft({ siteName: next.siteName, homepageTitle: next.homepageTitle, description: next.description });
     }
-    setNotice({ tone: "success", text: successText });
+    toast.success(successText);
   }
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
@@ -190,9 +191,7 @@ export default function SiteSettingsForm() {
         </section>
 
         {notice && (
-          <div role={notice.tone === "error" ? "alert" : "status"} className={`flex items-start gap-2 rounded-md border px-4 py-3 text-sm ${notice.tone === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
-            {notice.tone === "success" && <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />}{notice.text}
-          </div>
+          <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{notice.text}</div>
         )}
 
         <div className="flex justify-end">

@@ -56,8 +56,10 @@
     "next-themes": "^0.4.6",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "sonner": "^2.0.8",
     "tailwind-merge": "^2.3.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "yet-another-react-lightbox": "^3.32.2"
   },
   "devDependencies": {
     "@prisma/client": "^5.22.0",

@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Loader2, Pencil, Plus, Radio, Save, Trash2 } from "lucide-react";
+import { AlertTriangle, Loader2, Pencil, Plus, Radio, Save, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -50,7 +51,7 @@ export default function ChannelManager() {
   const [channels, setChannels] = useState<AdminChannel[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [notice, setNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [notice, setNotice] = useState<{ tone: "error"; text: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminChannel | null>(null);
 
   const reload = useCallback(async () => {
@@ -78,7 +79,7 @@ export default function ChannelManager() {
         body: JSON.stringify({ username: data.get("username") }),
       });
       form.reset();
-      setNotice({ tone: "success", text: "频道已接入，新推送会通过共享 Bot 实时归档。" });
+      toast.success("频道已接入，新推送会通过共享 Bot 实时归档。");
       await reload();
     } catch (error) {
       setNotice({ tone: "error", text: error instanceof Error ? error.message : "添加失败" });
@@ -106,7 +107,7 @@ export default function ChannelManager() {
         method: "PATCH",
         body: JSON.stringify(body),
       });
-      setNotice({ tone: "success", text: `@${channel.username} 的频道设置已保存。` });
+      toast.success(`@${channel.username} 的频道设置已保存。`);
       await reload();
     } catch (error) {
       setNotice({ tone: "error", text: error instanceof Error ? error.message : "保存失败" });
@@ -121,7 +122,7 @@ export default function ChannelManager() {
     setNotice(null);
     try {
       await api(`/api/admin/channels/${encodeURIComponent(deleteTarget.id)}`, { method: "DELETE" });
-      setNotice({ tone: "success", text: `@${deleteTarget.username} 已删除。` });
+      toast.success(`@${deleteTarget.username} 已删除。`);
       setDeleteTarget(null);
       await reload();
     } catch (error) {
@@ -147,8 +148,8 @@ export default function ChannelManager() {
       </section>
 
       {notice && (
-        <div role={notice.tone === "error" ? "alert" : "status"} className={`flex items-start gap-2 rounded-md border px-4 py-3 text-sm ${notice.tone === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
-          {notice.tone === "success" ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" /> : <AlertTriangle className="mt-0.5 size-4 shrink-0" />}{notice.text}
+        <div role="alert" className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" />{notice.text}
         </div>
       )}
 
