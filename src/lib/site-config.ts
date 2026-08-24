@@ -67,7 +67,7 @@ export const DEFAULT_SEO_SETTINGS: StoredSeoSettings = {
   description:
     "精选优质网站、实用工具与开源项目，聚合 AI、效率应用、编程与科技资源，每日更新。",
   keywords: DEFAULT_KEYWORDS,
-  canonicalUrl: "https://archive.example.com",
+  canonicalUrl: "https://example.com",
   ogImageKey: null,
   robotsIndex: true,
   robotsFollow: true,

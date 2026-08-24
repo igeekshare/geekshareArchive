@@ -37,7 +37,7 @@ const DEFAULT_CHANNEL = {
   title: "极客分享",
   username: "xgeekshare",
   telegramUrl: "https://t.me/xgeekshare",
-  archiveUrl: "https://archive.example.com",
+  archiveUrl: process.env.SITE_URL ?? "http://localhost:8787",
   description: "GeekShare Telegram channel archive",
 };
 

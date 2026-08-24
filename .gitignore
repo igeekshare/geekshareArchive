@@ -53,6 +53,7 @@ Thumbs.db
 .netlify/
 .wrangler/
 .dev.vars
+/wrangler.jsonc
 worker-configuration.d.ts
 .data/
 

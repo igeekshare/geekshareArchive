@@ -1,0 +1,106 @@
+[
+  {
+    "id": "message1001",
+    "date": "01.01.2026 09:00:00 UTC+08:00",
+    "from": "极客分享 Demo",
+    "text": "欢迎使用 GeekShare Archive 演示数据。#演示 #归档",
+    "media": null,
+    "replyTo": null,
+    "reactions": [
+      { "emoji": "👋", "count": "12" }
+    ]
+  },
+  {
+    "id": "message1002",
+    "date": "15.01.2026 10:30:00 UTC+08:00",
+    "from": "极客分享 Demo",
+    "text": "这条消息用于测试中文关键词和标签筛选。#搜索 #中文",
+    "media": null,
+    "replyTo": null,
+    "reactions": null
+  },
+  {
+    "id": "message1003",
+    "date": "01.02.2026 11:00:00 UTC+08:00",
+    "from": "极客分享 Demo",
+    "text": "安全外链示例：<a href=\"https://example.com/\" rel=\"noopener noreferrer\">Example</a>。#链接",
+    "media": null,
+    "replyTo": null,
+    "reactions": [
+      { "emoji": "🔗", "count": "3" }
+    ]
+  },
+  {
+    "id": "message1004",
+    "date": "14.02.2026 14:20:00 UTC+08:00",
+    "from": "极客分享 Demo",
+    "text": "HTML 样式示例：<strong>粗体</strong>、<em>斜体</em>、<code>const demo = true</code>。#格式",
+    "media": null,
+    "replyTo": null,
+    "reactions": null
+  },
+  {
+    "id": "message1005",
+    "date": "01.03.2026 08:15:00 UTC+08:00",
+    "from": "极客分享 Demo",
+    "text": "这条演示消息回复第一条记录，可测试回复跳转。#回复",
+    "media": null,
+    "replyTo": "message1001",
+    "reactions": [
+      { "emoji": "↩️", "count": "5" }
+    ]
+  },
+  {
+    "id": "message1006",
+    "date": "08.03.2026 16:45:00 UTC+08:00",
+    "from": "极客分享 Demo",
+    "text": "多反应演示消息。#互动",
+    "media": null,
+    "replyTo": null,
+    "reactions": [
+      { "emoji": "👍", "count": "18" },
+      { "emoji": "❤️", "count": "7" },
+      { "emoji": "🔥", "count": "4" }
+    ]
+  },
+  {
+    "id": "message1007",
+    "date": "01.04.2026 09:10:00 UTC+08:00",
+    "from": "极客分享 Demo",
+    "text": "Cloudflare Worker 使用 D1 保存消息，使用 R2 保存媒体。#Cloudflare #技术栈",
+    "media": null,
+    "replyTo": null,
+    "reactions": null
+  },
+  {
+    "id": "message1008",
+    "date": "12.04.2026 13:00:00 UTC+08:00",
+    "from": "极客分享 Demo",
+    "text": "Telegram Webhook 会先保存正文，再异步归档媒体。#Telegram #Webhook",
+    "media": null,
+    "replyTo": null,
+    "reactions": [
+      { "emoji": "✈️", "count": "9" }
+    ]
+  },
+  {
+    "id": "message1009",
+    "date": "01.05.2026 18:30:00 UTC+08:00",
+    "from": "极客分享 Demo",
+    "text": "这条消息用于验证五月归档和分页元数据。#时间筛选",
+    "media": null,
+    "replyTo": null,
+    "reactions": null
+  },
+  {
+    "id": "message1010",
+    "date": "17.08.2026 20:00:00 UTC+08:00",
+    "from": "极客分享 Demo",
+    "text": "演示数据集最后一条消息：所有内容均可安全删除和重新生成。#演示 #完成",
+    "media": null,
+    "replyTo": "message1009",
+    "reactions": [
+      { "emoji": "✅", "count": "10" }
+    ]
+  }
+]

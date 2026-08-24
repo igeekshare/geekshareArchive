@@ -96,6 +96,6 @@
 
   <!-- 右下角域名 -->
   <text x="1140" y="570" class="meta" fill="#ffffff" fill-opacity="0.9" text-anchor="end">
-    archive.example.com
+    your-domain.example
   </text>
 </svg>
