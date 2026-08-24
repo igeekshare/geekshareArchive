@@ -52,7 +52,26 @@ test("feed cards render the rich body, every tag and every media item", () => {
   assert.match(html, /#macos/);
   assert.match(html, /#local/);
   assert.match(html, /photo-5\.jpg/);
+  assert.equal(html.match(/aria-label="查看内容大图"/g)?.length, 5);
   assert.doesNotMatch(html, /object-cover/);
+});
+
+test("mixed attachments keep non-photo rendering and skip unavailable photos in the viewer", () => {
+  const html = renderToStaticMarkup(createElement(MessageCard, {
+    message: publicMessage({
+      mediaItems: [
+        { type: "photo", url: "https://cdn.example.com/photo.jpg", archiveStatus: "archived" },
+        { type: "photo", archiveStatus: "failed" },
+        { type: "video", url: "https://cdn.example.com/video.mp4", archiveStatus: "archived" },
+        { type: "file", url: "https://cdn.example.com/guide.pdf", title: "使用指南", archiveStatus: "archived" },
+      ],
+    }),
+  }));
+
+  assert.equal(html.match(/aria-label="查看内容大图"/g)?.length, 1);
+  assert.match(html, /媒体暂不可用，正文不受影响/);
+  assert.match(html, /<video[^>]+video\.mp4/);
+  assert.match(html, /使用指南/);
 });
 
 test("detail cards keep the same content order without clamping or summary duplication", () => {

@@ -71,6 +71,22 @@ html {
   scroll-behavior: smooth;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  [data-state="open"],
+  [data-state="closed"] {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .animate-pulse {
+    animation: none !important;
+  }
+}
+
 body {
   color: hsl(var(--foreground));
   background: hsl(var(--background));

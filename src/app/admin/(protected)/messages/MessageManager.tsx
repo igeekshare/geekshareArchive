@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
-  CheckCircle2,
   ExternalLink,
   Eye,
   EyeOff,
@@ -19,6 +18,7 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { adminRequestJson as requestJson } from "@/lib/admin-api";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -149,7 +149,7 @@ export default function MessageManager() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [notice, setNotice] = useState<{ tone: "error"; text: string } | null>(null);
   const [editing, setEditing] = useState<AdminMessage | null>(null);
   const [deleteIds, setDeleteIds] = useState<string[]>([]);
 
@@ -244,7 +244,7 @@ export default function MessageManager() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      setNotice({ tone: "success", text: successText });
+      toast.success(successText);
       setEditing(null);
       reload();
     } catch (reason) {
@@ -262,7 +262,7 @@ export default function MessageManager() {
         `/api/admin/messages/${encodeURIComponent(message.id)}/retry-media`,
         { method: "POST", headers: { "Content-Type": "application/json" } },
       );
-      setNotice({ tone: "success", text: `媒体重试完成，当前状态：${result.archiveStatus ?? "unknown"}` });
+      toast.success(`媒体重试完成，当前状态：${result.archiveStatus ?? "unknown"}`);
       reload();
     } catch (reason) {
       setNotice({ tone: "error", text: reason instanceof Error ? reason.message : "媒体重试失败" });
@@ -286,14 +286,11 @@ export default function MessageManager() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, ids }),
       });
-      setNotice({
-        tone: result.failed ? "error" : "success",
-        text: result.failed
-          ? `已完成 ${result.succeeded} 条，${result.failed} 条失败；请缩小筛选后重试。`
-          : action === "retry-media"
-            ? `已将 ${result.succeeded} 条媒体重试加入后台任务。`
-            : `已更新 ${result.succeeded} 条消息。`,
-      });
+      if (result.failed) {
+        setNotice({ tone: "error", text: `已完成 ${result.succeeded} 条，${result.failed} 条失败；请缩小筛选后重试。` });
+      } else {
+        toast.success(action === "retry-media" ? `已将 ${result.succeeded} 条媒体重试加入后台任务。` : `已更新 ${result.succeeded} 条消息。`);
+      }
       reload();
     } catch (reason) {
       setNotice({ tone: "error", text: reason instanceof Error ? reason.message : "批量操作失败" });
@@ -312,21 +309,22 @@ export default function MessageManager() {
           `/api/admin/messages/${encodeURIComponent(deleteIds[0])}`,
           { method: "DELETE" },
         );
-        setNotice(result.status === "complete"
-          ? { tone: "success", text: "消息已永久删除，已知 R2 对象已完成清理。" }
-          : { tone: "error", text: result.error ?? "消息已从公开站隐藏，媒体清理失败，将由维护任务继续重试。" });
+        if (result.status === "complete") {
+          toast.success("消息已永久删除，已知 R2 对象已完成清理。");
+        } else {
+          setNotice({ tone: "error", text: result.error ?? "消息已从公开站隐藏，媒体清理失败，将由维护任务继续重试。" });
+        }
       } else {
         const result = await requestJson<{ succeeded: number; failed: number }>("/api/admin/messages/bulk", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "delete", ids: deleteIds }),
         });
-        setNotice({
-          tone: result.failed ? "error" : "success",
-          text: result.failed
-            ? `${result.succeeded} 条已删除，${result.failed} 条等待清理或处理失败。`
-            : `${result.succeeded} 条消息已永久删除。`,
-        });
+        if (result.failed) {
+          setNotice({ tone: "error", text: `${result.succeeded} 条已删除，${result.failed} 条等待清理或处理失败。` });
+        } else {
+          toast.success(`${result.succeeded} 条消息已永久删除。`);
+        }
       }
       setDeleteIds([]);
       reload();
@@ -383,8 +381,8 @@ export default function MessageManager() {
       )}
 
       {notice && (
-        <div role={notice.tone === "error" ? "alert" : "status"} className={`flex items-start gap-2 rounded-lg border px-4 py-3 text-sm ${notice.tone === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
-          {notice.tone === "success" ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" /> : <AlertTriangle className="mt-0.5 size-4 shrink-0" />}{notice.text}
+        <div role="alert" className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" />{notice.text}
         </div>
       )}
 

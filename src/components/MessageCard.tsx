@@ -1,13 +1,16 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowRight, Copy, Download, ExternalLink, FileText, ImageIcon, Link2, MoreHorizontal } from "lucide-react";
+import { toast } from "sonner";
 import type { PublicMedia, PublicMessage } from "@/lib/messages";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+
+const MessageLightbox = dynamic(() => import("@/components/MessageLightbox"), { ssr: false });
 
 function mediaUrl(value?: string): string | undefined {
   if (!value) return undefined;
@@ -32,7 +35,7 @@ function formatFileSize(size?: number) {
   return `${(size / (1024 * 1024)).toFixed(size >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
 }
 
-function MediaItem({ media }: { media: PublicMedia }) {
+function MediaItem({ media, onOpenPhoto }: { media: PublicMedia; onOpenPhoto?: () => void }) {
   const url = mediaUrl(media.url);
   const thumb = mediaUrl(media.thumb);
   if (!url) {
@@ -45,18 +48,9 @@ function MediaItem({ media }: { media: PublicMedia }) {
 
   if (media.type === "photo") {
     return (
-      <Dialog>
-        <DialogTrigger asChild>
-          <button className="flex w-full items-center justify-center overflow-hidden rounded-lg border bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <img src={thumb || url} alt={media.description || "内容配图"} className="block h-auto max-h-[min(70vh,640px)] max-w-full object-contain" loading="lazy" />
-          </button>
-        </DialogTrigger>
-        <DialogContent className="max-h-[94vh] max-w-[94vw] border-0 bg-transparent p-0 shadow-none">
-          <DialogTitle className="sr-only">查看内容图片</DialogTitle>
-          <DialogDescription className="sr-only">按 Esc 关闭图片查看</DialogDescription>
-          <img src={url} alt={media.description || "内容大图"} className="max-h-[92vh] max-w-[92vw] rounded-lg object-contain shadow-2xl" />
-        </DialogContent>
-      </Dialog>
+      <button type="button" onClick={onOpenPhoto} aria-label="查看内容大图" className="flex w-full items-center justify-center overflow-hidden rounded-lg border bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <img src={thumb || url} alt={media.description || "内容配图"} className="block h-auto max-h-[min(70vh,640px)] max-w-full object-contain" loading="lazy" />
+      </button>
     );
   }
 
@@ -83,12 +77,30 @@ function MediaItem({ media }: { media: PublicMedia }) {
 }
 
 function MessageMedia({ message }: { message: PublicMessage }) {
+  const [openPhotoIndex, setOpenPhotoIndex] = useState<number | null>(null);
   const items = message.mediaItems.length ? message.mediaItems : message.media ? [message.media] : [];
   if (!items.length) return null;
+  const photos = items.flatMap((media) => {
+    const src = media.type === "photo" ? mediaUrl(media.url) : undefined;
+    return src ? [{ media, src, alt: media.description || "内容图片" }] : [];
+  });
+
   return (
-    <div className={cn("mt-4 grid items-start gap-2", items.length > 1 && "sm:grid-cols-2")}>
-      {items.map((media, index) => <MediaItem key={`${media.url ?? media.type}-${index}`} media={media} />)}
-    </div>
+    <>
+      <div className={cn("mt-4 grid items-start gap-2", items.length > 1 && "sm:grid-cols-2")}>
+        {items.map((media, index) => {
+          const photoIndex = photos.findIndex((photo) => photo.media === media);
+          return <MediaItem key={`${media.url ?? media.type}-${index}`} media={media} onOpenPhoto={photoIndex >= 0 ? () => setOpenPhotoIndex(photoIndex) : undefined} />;
+        })}
+      </div>
+      {openPhotoIndex !== null && (
+        <MessageLightbox
+          slides={photos.map(({ src, alt }) => ({ src, alt }))}
+          initialIndex={openPhotoIndex}
+          onClose={() => setOpenPhotoIndex(null)}
+        />
+      )}
+    </>
   );
 }
 
@@ -185,7 +197,6 @@ type MessageCardProps = {
 };
 
 export default function MessageCard({ message, mode = "feed", onScrollToReply, onTagClick, onOpenDetail, className }: MessageCardProps) {
-  const [copied, setCopied] = useState(false);
   const detail = mode === "detail";
   const formatted = useMemo(() => formatMessageDate(message.datetime ?? message.date), [message.date, message.datetime]);
   const href = `/message/${encodeURIComponent(message.id)}`;
@@ -194,9 +205,12 @@ export default function MessageCard({ message, mode = "feed", onScrollToReply, o
   const richTitleClassName = "break-words";
 
   const copyLink = async () => {
-    await navigator.clipboard.writeText(`${window.location.origin}${href}`);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${href}`);
+      toast.success("归档链接已复制");
+    } catch {
+      toast.error("复制失败，请从地址栏手动复制链接。");
+    }
   };
 
   return (
@@ -220,7 +234,7 @@ export default function MessageCard({ message, mode = "feed", onScrollToReply, o
           <DropdownMenuContent align="end">
             {!detail && <DropdownMenuItem asChild><a href={href} onClick={onOpenDetail}><ArrowRight />阅读全文</a></DropdownMenuItem>}
             <DropdownMenuItem asChild><a href={message.sourceUrl} target="_blank" rel="noreferrer"><ExternalLink />Telegram 原文</a></DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => void copyLink()}><Copy />{copied ? "已复制" : "复制归档链接"}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void copyLink()}><Copy />复制归档链接</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </header>

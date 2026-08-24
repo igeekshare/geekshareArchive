@@ -20,6 +20,10 @@ const RESTORE_KEY = "geekshare:feed-position";
 
 type RestoreState = { search: string; scrollY: number; loadedCount: number };
 
+function preferredScrollBehavior(): ScrollBehavior {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+}
+
 function paramCategory(value: string | null): MessageCategory {
   return categories.includes(value as MessageCategory) ? (value as MessageCategory) : "all";
 }
@@ -147,7 +151,7 @@ export default function ArchivePageClient() {
 
   const scrollToFeed = useCallback(() => {
     const y = (feedRef.current?.getBoundingClientRect().top ?? 0) + window.scrollY - (window.innerWidth < 768 ? 176 : 120);
-    window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+    window.scrollTo({ top: Math.max(0, y), behavior: preferredScrollBehavior() });
   }, []);
 
   const selectTag = useCallback((tag: string) => {
@@ -162,7 +166,7 @@ export default function ArchivePageClient() {
       window.location.assign(`/message/${encodeURIComponent(replyId)}`);
       return;
     }
-    document.getElementById(replyId)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    document.getElementById(replyId)?.scrollIntoView({ behavior: preferredScrollBehavior(), block: "center" });
   }, [messageIds, rememberPosition]);
 
   const loadMore = async () => {
@@ -231,11 +235,11 @@ export default function ArchivePageClient() {
             ) : loading ? (
               <div className="space-y-3">{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-56 w-full rounded-xl" />)}</div>
             ) : messages.length ? (
-              <div className="space-y-3">
+              <div key={filterKey} className="space-y-3 motion-safe:animate-in motion-safe:fade-in motion-safe:[animation-duration:180ms]">
                 {messages.map((message) => <MessageCard key={message.id} message={message} onScrollToReply={handleScrollToReply} onTagClick={selectTag} onOpenDetail={rememberPosition} />)}
               </div>
             ) : (
-              <div className="rounded-xl border bg-card py-24 text-center">
+              <div key={filterKey} className="rounded-xl border bg-card py-24 text-center motion-safe:animate-in motion-safe:fade-in motion-safe:[animation-duration:180ms]">
                 <Search className="mx-auto size-8 text-muted-foreground/50" />
                 <h2 className="mt-3 text-base font-bold">没有找到匹配内容</h2>
                 <p className="mt-1 text-sm text-muted-foreground">换个关键词，或清除当前筛选条件。</p>
@@ -255,7 +259,7 @@ export default function ArchivePageClient() {
         </div>
       </main>
 
-      <Button variant="secondary" size="icon" aria-label="返回顶部" className={`fixed bottom-6 right-6 z-40 rounded-xl border shadow-lg transition-all ${isScrolled ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-4 opacity-0"}`} onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}><ArrowUp /></Button>
+      <Button variant="secondary" size="icon" aria-label="返回顶部" className={`fixed bottom-6 right-6 z-40 rounded-xl border shadow-lg transition-all motion-reduce:transition-none ${isScrolled ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-4 opacity-0"}`} onClick={() => window.scrollTo({ top: 0, behavior: preferredScrollBehavior() })}><ArrowUp /></Button>
     </div>
   );
 }

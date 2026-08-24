@@ -13,6 +13,7 @@ import {
   Unplug,
   Webhook,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -44,7 +45,7 @@ function StatusPill({ ready, children }: { ready: boolean; children: React.React
 export default function SyncPage() {
   const [status, setStatus] = useState<TelegramStatus | null>(null);
   const [messageId, setMessageId] = useState("");
-  const [notice, setNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [notice, setNotice] = useState<{ tone: "error"; text: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmDisable, setConfirmDisable] = useState(false);
@@ -68,10 +69,10 @@ export default function SyncPage() {
     try {
       if (action === "test") {
         const result = await requestJson<{ bot: { first_name: string; username?: string } }>("/api/admin/telegram/test", { method: "POST", headers: { "Content-Type": "application/json" } });
-        setNotice({ tone: "success", text: `连接成功：${result.bot.first_name}${result.bot.username ? ` (@${result.bot.username})` : ""}` });
+        toast.success(`连接成功：${result.bot.first_name}${result.bot.username ? ` (@${result.bot.username})` : ""}`);
       } else {
         await requestJson("/api/admin/telegram/webhook", { method: action === "register" ? "PUT" : "DELETE", headers: { "Content-Type": "application/json" } });
-        setNotice({ tone: "success", text: action === "register" ? "Webhook 已注册并校准。" : "Webhook 已停用，待处理 Update 未被丢弃。" });
+        toast.success(action === "register" ? "Webhook 已注册并校准。" : "Webhook 已停用，待处理 Update 未被丢弃。");
       }
       setConfirmDisable(false);
       await load();
@@ -88,7 +89,7 @@ export default function SyncPage() {
     setNotice(null);
     try {
       const body = await requestJson<{ archiveStatus?: string }>(`/api/admin/messages/${encodeURIComponent(messageId.trim())}/retry-media`, { method: "POST", headers: { "Content-Type": "application/json" } });
-      setNotice({ tone: "success", text: `媒体重试完成，当前状态：${body.archiveStatus ?? "unknown"}` });
+      toast.success(`媒体重试完成，当前状态：${body.archiveStatus ?? "unknown"}`);
       setMessageId("");
       await load();
     } catch (error) {
@@ -111,7 +112,7 @@ export default function SyncPage() {
         <Button variant="outline" onClick={() => void load()} disabled={loading || busy !== null}><RefreshCw className={loading ? "animate-spin" : ""} />刷新状态</Button>
       </div>
 
-      {notice && <div role={notice.tone === "error" ? "alert" : "status"} className={`mt-6 flex items-start gap-2 rounded-md border px-4 py-3 text-sm ${notice.tone === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>{notice.tone === "success" ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" /> : <AlertTriangle className="mt-0.5 size-4 shrink-0" />}{notice.text}</div>}
+      {notice && <div role="alert" className="mt-6 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><AlertTriangle className="mt-0.5 size-4 shrink-0" />{notice.text}</div>}
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
         <div className="space-y-6">
