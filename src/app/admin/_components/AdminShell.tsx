@@ -11,23 +11,18 @@ import {
   SearchCheck,
   Settings,
 } from "lucide-react";
-import { logoutAction } from "../actions";
 
 const navigation = [
-  { href: "/admin", label: "概览", icon: LayoutDashboard },
+  { href: "/admin/dashboard", label: "概览", icon: LayoutDashboard },
   { href: "/admin/channels", label: "频道管理", icon: RadioTower },
   { href: "/admin/messages", label: "内容管理", icon: FileText },
-  { href: "/admin/sync", label: "同步管理", icon: SearchCheck },
+  { href: "/admin/sync", label: "Telegram 同步", icon: SearchCheck },
   { href: "/admin/seo", label: "SEO 设置", icon: Globe2 },
   { href: "/admin/site", label: "站点设置", icon: Settings },
 ];
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-
-  if (pathname === "/admin/login") {
-    return <div className="min-h-dvh bg-zinc-100">{children}</div>;
-  }
 
   return (
     <div className="min-h-dvh bg-zinc-100 text-zinc-950">
@@ -36,16 +31,14 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           <p className="text-sm font-semibold">GeekShare</p>
           <p className="text-xs text-zinc-500">管理后台</p>
         </div>
-        <form action={logoutAction}>
-          <button
-            type="submit"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950"
-            title="退出登录"
-          >
-            <LogOut className="h-4 w-4" aria-hidden="true" />
-            <span className="sr-only">退出登录</span>
-          </button>
-        </form>
+        <a
+          href="/cdn-cgi/access/logout"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950"
+          title="退出登录"
+        >
+          <LogOut className="h-4 w-4" aria-hidden="true" />
+          <span className="sr-only">退出登录</span>
+        </a>
       </header>
 
       <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-zinc-200 bg-white lg:flex">
@@ -58,9 +51,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
         <nav className="flex-1 space-y-1 px-3 py-4" aria-label="后台导航">
           {navigation.map(({ href, label, icon: Icon }) => {
-            const isActive =
-              pathname === href ||
-              (href !== "/admin" && pathname.startsWith(`${href}/`));
+            const isActive = pathname === href || pathname.startsWith(`${href}/`);
 
             return (
               <Link
@@ -80,15 +71,13 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         </nav>
 
         <div className="border-t border-zinc-200 p-3">
-          <form action={logoutAction}>
-            <button
-              type="submit"
-              className="flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950"
-            >
-              <LogOut className="h-4 w-4" aria-hidden="true" />
-              退出登录
-            </button>
-          </form>
+          <a
+            href="/cdn-cgi/access/logout"
+            className="flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950"
+          >
+            <LogOut className="h-4 w-4" aria-hidden="true" />
+            退出登录
+          </a>
         </div>
       </aside>
 
@@ -98,9 +87,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           aria-label="后台导航"
         >
           {navigation.map(({ href, label }) => {
-            const isActive =
-              pathname === href ||
-              (href !== "/admin" && pathname.startsWith(`${href}/`));
+            const isActive = pathname === href || pathname.startsWith(`${href}/`);
 
             return (
               <Link

@@ -3,8 +3,27 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: 220 20% 98%;
+  --foreground: 222 32% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 32% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 32% 10%;
+  --primary: 359 72% 51%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 24% 96%;
+  --secondary-foreground: 222 22% 18%;
+  --muted: 220 24% 96%;
+  --muted-foreground: 220 9% 46%;
+  --accent: 220 24% 96%;
+  --accent-foreground: 222 22% 18%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 220 18% 89%;
+  --input: 220 18% 89%;
+  --ring: 359 72% 51%;
+  --telegram: 216 82% 46%;
+  --radius: 0.65rem;
   --tg-theme-bg-color: #ffffff;
   --tg-theme-text-color: #000000;
   --tg-theme-hint-color: #999999;
@@ -14,10 +33,27 @@
   --tg-theme-secondary-bg-color: #f4f4f5;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+.dark {
+    --background: 222 30% 7%;
+    --foreground: 210 20% 96%;
+    --card: 222 27% 10%;
+    --card-foreground: 210 20% 96%;
+    --popover: 222 27% 10%;
+    --popover-foreground: 210 20% 96%;
+    --primary: 359 94% 65%;
+    --primary-foreground: 222 32% 10%;
+    --secondary: 222 20% 15%;
+    --secondary-foreground: 210 20% 96%;
+    --muted: 222 20% 15%;
+    --muted-foreground: 215 15% 65%;
+    --accent: 222 20% 16%;
+    --accent-foreground: 210 20% 96%;
+    --destructive: 0 62% 43%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 222 18% 20%;
+    --input: 222 18% 20%;
+    --ring: 359 94% 65%;
+    --telegram: 214 94% 64%;
     --tg-theme-bg-color: #181818;
     --tg-theme-text-color: #ffffff;
     --tg-theme-hint-color: #aaaaaa;
@@ -25,17 +61,156 @@
     --tg-theme-button-color: #3390ec;
     --tg-theme-button-text-color: #ffffff;
     --tg-theme-secondary-bg-color: #212121;
-  }
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: hsl(var(--foreground));
+  background: hsl(var(--background));
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  min-width: 320px;
+}
+
+::selection {
+  color: hsl(var(--foreground));
+  background: hsl(var(--primary) / 0.18);
+}
+
+:focus-visible {
+  scroll-margin-block: 7rem;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  .home-brand {
+    font-size: 1rem;
+    line-height: 1.25;
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+
+  .home-nav {
+    font-size: 0.875rem;
+    line-height: 1.5;
+    font-weight: 500;
+  }
+
+  .home-hero-title {
+    font-size: 1.5rem;
+    line-height: 1.2;
+    font-weight: 800;
+    letter-spacing: 0;
+  }
+
+  .home-hero-description {
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+
+  .home-stat-value {
+    font-size: 0.875rem;
+    line-height: 1.25;
+    font-weight: 700;
+  }
+
+  .home-stat-label {
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+
+  .home-section-title {
+    font-size: 0.875rem;
+    line-height: 1.35;
+    font-weight: 700;
+  }
+
+  .home-supporting {
+    font-size: 0.75rem;
+    line-height: 1.5;
+  }
+
+  .home-control {
+    font-size: 0.8125rem;
+    line-height: 1.35;
+  }
+
+  .home-message-body {
+    font-size: 0.9375rem;
+    line-height: 1.8;
+  }
+
+  .home-meta {
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+
+  .home-timestamp {
+    font-size: 0.6875rem;
+    line-height: 1.4;
+  }
+
+  @media (max-width: 620px) {
+    .home-hero-title {
+      font-size: 1.375rem;
+      line-height: 1.25;
+    }
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .message-reading-body {
+    max-width: 72ch;
+    font-size: 1rem;
+    line-height: 1.9;
+  }
+
+  .message-reading-body--clamped {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 12;
+  }
+
+  .message-reading-body br {
+    line-height: 2;
+  }
+
+  .message-reading-body img,
+  .message-reading-body video {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.65rem;
+  }
+
+  @media (max-width: 620px) {
+    .message-reading-body {
+      font-size: 0.9375rem;
+      line-height: 1.85;
+    }
   }
 }

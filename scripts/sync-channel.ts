@@ -125,6 +125,7 @@ async function main() {
       `Imported: ${result.importedCount}`,
       `Updated: ${result.updatedCount}`,
       `Skipped: ${result.skippedCount}`,
+      `Failed: ${result.failedCount}`,
       `SyncLog ID: ${result.syncLogId}`,
     ].join("\n"),
   );

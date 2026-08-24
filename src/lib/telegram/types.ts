@@ -20,6 +20,14 @@ export type TelegramReaction = {
   count: string;
 };
 
+export type TelegramChannelProfile = {
+  username: string;
+  title: string;
+  description: string | null;
+  avatarUrl: string | null;
+  telegramUrl: string;
+};
+
 export type ParsedTelegramMessage = {
   telegramMessageId: string;
   sourceUrl: string;
@@ -50,6 +58,7 @@ export type TelegramSyncResult = {
   importedCount: number;
   updatedCount: number;
   skippedCount: number;
+  failedCount: number;
   parsedCount: number;
   syncLogId: string;
 };

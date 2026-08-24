@@ -1,267 +1,282 @@
 "use client";
 
-import React, { useState, forwardRef } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, ArrowRight, Copy, Download, ExternalLink, FileText, ImageIcon, Link2, MoreHorizontal } from "lucide-react";
+import type { PublicMedia, PublicMessage } from "@/lib/messages";
+import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
-interface Reaction {
-  emoji: string;
-  count: string;
+function mediaUrl(value?: string): string | undefined {
+  if (!value) return undefined;
+  if (/^https?:\/\//i.test(value)) return value;
+  return value.startsWith("/") ? value : `/${value}`;
 }
 
-interface Media {
-  type: "photo" | "video" | "file";
-  url: string;
-  thumb?: string;
-  width?: string;
-  height?: string;
-  title?: string;
-  description?: string;
+function formatMessageDate(value: string): { date: string; time: string } {
+  const telegram = value.match(/^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}:\d{2})/);
+  if (telegram) return { date: `${telegram[3]}年${telegram[2]}月${telegram[1]}日`, time: telegram[4] };
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return { date: value, time: "" };
+  return {
+    date: new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", year: "numeric", month: "long", day: "numeric" }).format(parsed),
+    time: new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit", hour12: false }).format(parsed),
+  };
 }
 
-interface MessageProps {
-  id: string;
-  date: string;
-  from: string;
-  text: string;
-  media?: Media | null;
-  replyTo?: string | null;
-  reactions?: Reaction[] | null;
-  onScrollToReply?: (replyId: string) => void;
+function formatFileSize(size?: number) {
+  if (!size || size <= 0) return null;
+  if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
+  return `${(size / (1024 * 1024)).toFixed(size >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
 }
 
-const MessageCard = forwardRef<HTMLDivElement, MessageProps>(
-  (
-    { id, date, from, text, media, replyTo, reactions, onScrollToReply },
-    ref,
-  ) => {
-    const [isImageOpen, setIsImageOpen] = useState(false);
-
-    // Time mapping: Parse Telegram date format "09.05.2022 16:36:05 UTC+08:00"
-    let formattedDate = date;
-    let formattedTime = "";
-    try {
-      const parts = date.split(" ");
-      if (parts.length >= 2) {
-        const [d, m, y] = parts[0].split(".");
-        const time = parts[1].substring(0, 5); // Extract HH:mm
-        formattedDate = `${y}年${m}月${d}日`;
-        formattedTime = time;
-      }
-    } catch (e) {
-      // Fallback to original string if parsing fails
-    }
-
-    // Render media components (Photos, Videos, Files)
-    const renderMedia = () => {
-      if (!media) return null;
-
-      if (media.type === "photo") {
-        return (
-          <>
-            <div
-              className="relative cursor-zoom-in overflow-hidden rounded-xl bg-gray-100 dark:bg-zinc-800/50 mt-3 border border-gray-200 dark:border-zinc-800 transition-opacity hover:opacity-95"
-              onClick={() => setIsImageOpen(true)}
-            >
-              <img
-                src={`/${media.thumb || media.url}`}
-                alt="Message Photo"
-                className="max-w-full max-h-[400px] w-auto h-auto object-contain mx-auto"
-                loading="lazy"
-              />
-            </div>
-
-            {/* Simple Lightbox */}
-            {isImageOpen && (
-              <div
-                className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 sm:p-8 cursor-zoom-out animate-in fade-in duration-200"
-                onClick={() => setIsImageOpen(false)}
-              >
-                <img
-                  src={`/${media.url}`}
-                  alt="Enlarged Photo"
-                  className="max-w-full max-h-full object-contain drop-shadow-2xl rounded-md"
-                />
-              </div>
-            )}
-          </>
-        );
-      }
-
-      if (media.type === "video") {
-        return (
-          <div className="mt-3 relative rounded-xl overflow-hidden bg-black aspect-video flex items-center justify-center group border border-gray-200 dark:border-zinc-800">
-            {media.thumb && (
-              <img
-                src={`/${media.thumb}`}
-                alt="Video Thumbnail"
-                className="absolute inset-0 w-full h-full object-cover opacity-50"
-              />
-            )}
-            <a
-              href={`/${media.url}`}
-              target="_blank"
-              rel="noreferrer"
-              className="relative z-10 flex flex-col items-center gap-2 transform transition group-hover:scale-110"
-            >
-              <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center shadow-lg border border-white/30 text-white">
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  className="w-6 h-6 ml-1"
-                >
-                  <path d="M5.536 21.886a1.004 1.004 0 001.033-.064l13-9a1 1 0 000-1.644l-13-9A1 1 0 005 3v18a1 1 0 00.536.886z" />
-                </svg>
-              </div>
-            </a>
-          </div>
-        );
-      }
-
-      if (media.type === "file") {
-        return (
-          <a href={`/${media.url}`} download className="mt-3 block group">
-            <div className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-800/30 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 transition-colors">
-              <div className="w-12 h-12 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                <svg
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={1.5}
-                  stroke="currentColor"
-                  className="w-6 h-6"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
-                  />
-                </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm truncate text-gray-900 dark:text-gray-100">
-                  {media.title || "下载附件"}
-                </p>
-                {media.description && (
-                  <p className="text-xs text-gray-500 truncate mt-0.5">
-                    {media.description}
-                  </p>
-                )}
-              </div>
-              <div className="text-blue-600 dark:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                <svg
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={2}
-                  stroke="currentColor"
-                  className="w-5 h-5"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
-                  />
-                </svg>
-              </div>
-            </div>
-          </a>
-        );
-      }
-
-      return null;
-    };
-
-    const initial = from ? from.charAt(0) : "?";
-    const numericId = id.replace("message", "");
-
+function MediaItem({ media }: { media: PublicMedia }) {
+  const url = mediaUrl(media.url);
+  const thumb = mediaUrl(media.thumb);
+  if (!url) {
     return (
-      <div
-        id={id}
-        ref={ref}
-        className="flex gap-4 p-5 sm:p-6 bg-white dark:bg-zinc-900/80 rounded-2xl shadow-sm border border-gray-100 dark:border-zinc-800 transition-all hover:shadow-md group"
-      >
-        {/* Sender Avatar */}
-        <div className="shrink-0 pt-1">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
-            {initial}
-          </div>
-        </div>
-
-        {/* Message Content */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-4 mb-1.5">
-            <h3 className="font-bold text-zinc-900 dark:text-zinc-100 text-sm sm:text-base truncate">
-              {from}
-            </h3>
-            <div className="flex items-center gap-2 text-xs text-zinc-400 dark:text-zinc-500 shrink-0">
-              <span title={date} className="font-medium tracking-wide">
-                {formattedDate} {formattedTime}
-              </span>
-              <Link
-                href={`/message/${id}`}
-                className="opacity-0 group-hover:opacity-100 hover:text-blue-500 transition-opacity font-mono"
-              >
-                #{numericId}
-              </Link>
-            </div>
-          </div>
-
-          {/* Reply Context */}
-          {replyTo && (
-            <div
-              className="mb-3 pl-3 py-2 border-l-2 border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20 rounded-r-md text-sm text-zinc-600 dark:text-zinc-400 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
-              onClick={() => {
-                if (onScrollToReply) {
-                  onScrollToReply(replyTo);
-                }
-              }}
-            >
-              <span className="text-blue-700 dark:text-blue-400 text-xs font-semibold block mb-0.5">
-                回复了消息
-              </span>
-              <span className="truncate pr-2 block italic text-[13px]">
-                点击向上滚动查看原消息
-              </span>
-            </div>
-          )}
-
-          {/* Text Content with Tags Styling */}
-          {text && (
-            <div
-              className="text-[15px] sm:text-base leading-relaxed break-words text-zinc-800 dark:text-zinc-200
-                         prose-p:mb-2 prose-p:last:mb-0
-                         [&_a]:break-all [&_a]:text-blue-600 [&_a]:dark:text-blue-400 [&_a]:bg-blue-50 [&_a]:dark:bg-blue-900/30 [&_a]:px-1.5 [&_a]:py-0.5 [&_a]:rounded-md [&_a]:no-underline hover:[&_a]:bg-blue-100 hover:[&_a]:dark:bg-blue-900/50 [&_a]:transition-colors [&_a]:font-medium"
-              dangerouslySetInnerHTML={{
-                __html: text.replace(
-                  /(^|\s|>)#([A-Za-z0-9_\u4e00-\u9fa5]+)/g,
-                  '$1<span class="inline-block bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded-md text-sm font-medium mr-1 cursor-pointer transition-colors hover:bg-blue-100 dark:hover:bg-blue-900/50 active:scale-95" title="点击过滤此标签">#$2</span>',
-                ),
-              }}
-            />
-          )}
-
-          {renderMedia()}
-
-          {/* Reactions */}
-          {reactions && reactions.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-3.5">
-              {reactions.map((r, i) => (
-                <div
-                  key={i}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/50 text-[13px] hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors cursor-default shadow-sm"
-                >
-                  <span>{r.emoji}</span>
-                  <span className="text-zinc-600 dark:text-zinc-400 font-semibold">
-                    {r.count}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+      <div className="flex min-h-24 items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-4 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+        <ImageIcon className="size-4" />媒体暂不可用，正文不受影响
       </div>
     );
-  },
-);
+  }
 
-MessageCard.displayName = "MessageCard";
+  if (media.type === "photo") {
+    return (
+      <Dialog>
+        <DialogTrigger asChild>
+          <button className="flex w-full items-center justify-center overflow-hidden rounded-lg border bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <img src={thumb || url} alt={media.description || "内容配图"} className="block h-auto max-h-[min(70vh,640px)] max-w-full object-contain" loading="lazy" />
+          </button>
+        </DialogTrigger>
+        <DialogContent className="max-h-[94vh] max-w-[94vw] border-0 bg-transparent p-0 shadow-none">
+          <DialogTitle className="sr-only">查看内容图片</DialogTitle>
+          <DialogDescription className="sr-only">按 Esc 关闭图片查看</DialogDescription>
+          <img src={url} alt={media.description || "内容大图"} className="max-h-[92vh] max-w-[92vw] rounded-lg object-contain shadow-2xl" />
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
-export default MessageCard;
+  if (media.type === "video") {
+    return <video src={url} poster={thumb} controls preload="metadata" playsInline className="max-h-[min(70vh,640px)] w-full rounded-lg border bg-slate-950 object-contain" />;
+  }
+
+  if (media.type === "file") {
+    const meta = [media.mimeType?.split("/").pop()?.toUpperCase(), formatFileSize(media.size)].filter(Boolean).join(" · ");
+    return (
+      <a href={url} download className="group flex items-center gap-3 rounded-lg border bg-muted/30 p-3 transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300"><FileText className="size-5" /></span>
+        <span className="min-w-0 flex-1"><strong className="block truncate text-sm">{media.title || "下载附件"}</strong>{meta && <span className="mt-0.5 block text-xs text-muted-foreground">{meta}</span>}</span>
+        <Download className="size-4 text-muted-foreground transition group-hover:text-blue-600" />
+      </a>
+    );
+  }
+
+  return (
+    <a href={url} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-lg border bg-muted/30 p-3 text-sm font-semibold text-blue-600 transition hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-blue-300 dark:hover:bg-blue-950/40">
+      <Link2 className="size-4" />{media.title || media.description || "打开相关链接"}<ExternalLink className="ml-auto size-3.5" />
+    </a>
+  );
+}
+
+function MessageMedia({ message }: { message: PublicMessage }) {
+  const items = message.mediaItems.length ? message.mediaItems : message.media ? [message.media] : [];
+  if (!items.length) return null;
+  return (
+    <div className={cn("mt-4 grid items-start gap-2", items.length > 1 && "sm:grid-cols-2")}>
+      {items.map((media, index) => <MediaItem key={`${media.url ?? media.type}-${index}`} media={media} />)}
+    </div>
+  );
+}
+
+function MessageBody({
+  html,
+  detail,
+  href,
+  onOpenDetail,
+}: {
+  html: string;
+  detail: boolean;
+  href: string;
+  onOpenDetail?: () => void;
+}) {
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [overflowing, setOverflowing] = useState(false);
+
+  useEffect(() => {
+    const body = bodyRef.current;
+    if (!body || detail || !html) {
+      setOverflowing(false);
+      return;
+    }
+
+    let cancelled = false;
+    const measure = () => {
+      if (cancelled) return;
+      const nextOverflowing = body.scrollHeight > body.clientHeight + 1;
+      setOverflowing(nextOverflowing);
+
+      const visibleBounds = body.getBoundingClientRect();
+      body.querySelectorAll<HTMLAnchorElement>("a").forEach((link) => {
+        const visible = !nextOverflowing || [...link.getClientRects()].some((rect) => (
+          rect.bottom > visibleBounds.top && rect.top < visibleBounds.bottom
+        ));
+        if (visible) {
+          if (link.dataset.feedClamped === "true") {
+            link.removeAttribute("tabindex");
+            delete link.dataset.feedClamped;
+          }
+        } else {
+          link.tabIndex = -1;
+          link.dataset.feedClamped = "true";
+        }
+      });
+    };
+
+    measure();
+    const resizeObserver = new ResizeObserver(measure);
+    resizeObserver.observe(body);
+    void document.fonts?.ready.then(measure);
+
+    return () => {
+      cancelled = true;
+      resizeObserver.disconnect();
+      body.querySelectorAll<HTMLAnchorElement>('a[data-feed-clamped="true"]').forEach((link) => {
+        link.removeAttribute("tabindex");
+        delete link.dataset.feedClamped;
+      });
+    };
+  }, [detail, html]);
+
+  if (!html) return null;
+
+  return (
+    <div className="mt-3">
+      <div className="relative">
+        <div
+          ref={bodyRef}
+          className={cn(
+            "message-reading-body break-words text-foreground/90 [&_a]:font-medium [&_a]:text-blue-600 [&_a]:underline-offset-2 hover:[&_a]:underline dark:[&_a]:text-blue-300",
+            !detail && "message-reading-body--clamped",
+          )}
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+        {!detail && overflowing && <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-card via-card/90 to-transparent" />}
+      </div>
+      {!detail && overflowing && (
+        <a href={href} onClick={onOpenDetail} className="mt-1 inline-flex min-h-11 items-center gap-1.5 rounded-md text-sm font-semibold text-blue-600 underline-offset-4 transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-blue-300">
+          查看完整内容<ArrowRight className="size-3.5" />
+        </a>
+      )}
+    </div>
+  );
+}
+
+type MessageCardProps = {
+  message: PublicMessage;
+  mode?: "feed" | "detail";
+  onScrollToReply?: (replyId: string) => void;
+  onTagClick?: (tag: string) => void;
+  onOpenDetail?: () => void;
+  className?: string;
+};
+
+export default function MessageCard({ message, mode = "feed", onScrollToReply, onTagClick, onOpenDetail, className }: MessageCardProps) {
+  const [copied, setCopied] = useState(false);
+  const detail = mode === "detail";
+  const formatted = useMemo(() => formatMessageDate(message.datetime ?? message.date), [message.date, message.datetime]);
+  const href = `/message/${encodeURIComponent(message.id)}`;
+  const initial = message.channel.title?.charAt(0) || message.from?.charAt(0) || "极";
+  const richTitle = message.titleHtml?.trim();
+  const richTitleClassName = "break-words";
+
+  const copyLink = async () => {
+    await navigator.clipboard.writeText(`${window.location.origin}${href}`);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  };
+
+  return (
+    <article id={message.id} className={cn("group rounded-xl border bg-card p-4 sm:p-5", detail ? "sm:p-7" : "transition-colors hover:border-slate-300 dark:hover:border-slate-600", className)}>
+      <header className="flex items-start gap-3">
+        <Avatar className="mt-0.5 size-9 shrink-0 border sm:size-10">
+          <AvatarImage src={message.channel.avatarUrl} alt={message.channel.title} />
+          <AvatarFallback className="bg-slate-900 text-sm font-bold text-white">{initial}</AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <span className="truncate font-semibold text-foreground/80">{message.channel.title || message.from}</span>
+            <span aria-hidden="true">·</span>
+            <time title={message.datetime ?? message.date}>{formatted.date}{formatted.time ? ` ${formatted.time}` : ""}</time>
+            {message.isFeatured && <span className="rounded-full bg-red-50 px-2 py-0.5 font-semibold text-primary dark:bg-red-950/30">精选</span>}
+            {message.archiveStatus !== "archived" && message.archiveStatus !== "none" && <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-300"><AlertTriangle className="size-3" />{message.archiveStatus === "failed" ? "媒体异常" : "媒体处理中"}</span>}
+          </div>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="-mr-2 -mt-2 size-8 shrink-0 text-muted-foreground" aria-label="内容操作"><MoreHorizontal /></Button></DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {!detail && <DropdownMenuItem asChild><a href={href} onClick={onOpenDetail}><ArrowRight />阅读全文</a></DropdownMenuItem>}
+            <DropdownMenuItem asChild><a href={message.sourceUrl} target="_blank" rel="noreferrer"><ExternalLink />Telegram 原文</a></DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void copyLink()}><Copy />{copied ? "已复制" : "复制归档链接"}</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </header>
+
+      {message.replyTo && (
+        <button type="button" onClick={() => onScrollToReply?.(message.replyTo!)} className="mt-3 min-h-11 w-full rounded-lg border border-red-100 bg-red-50/70 px-3 py-2 text-left text-xs text-muted-foreground transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:border-red-950/60 dark:bg-red-950/20">回复了另一条内容，点击查看上下文</button>
+      )}
+
+      <div className="mt-3 sm:mt-4">
+        {detail ? (
+          <h1 className="text-balance text-2xl font-extrabold leading-[1.32] tracking-[-0.02em] sm:text-[2rem]">
+            {richTitle
+              ? <span className={richTitleClassName} dangerouslySetInnerHTML={{ __html: richTitle }} />
+              : message.title}
+          </h1>
+        ) : (
+          <h2 className="text-balance text-lg font-extrabold leading-[1.4] tracking-[-0.01em] sm:text-xl">
+            {richTitle ? (
+              <a
+                href={href}
+                onClick={onOpenDetail}
+                className="block rounded-sm transition hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:hover:text-blue-300"
+                dangerouslySetInnerHTML={{ __html: richTitle }}
+              />
+            ) : (
+              <a
+                href={href}
+                onClick={onOpenDetail}
+                className="transition hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:hover:text-blue-300"
+              >
+                {message.title}
+              </a>
+            )}
+          </h2>
+        )}
+
+        {message.tags.length > 0 && (
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {message.tags.map((tag) => (
+              <button key={tag} type="button" onClick={() => onTagClick?.(tag)} disabled={!onTagClick} className="min-h-8 rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 transition enabled:hover:bg-blue-100 enabled:focus-visible:outline-none enabled:focus-visible:ring-2 enabled:focus-visible:ring-ring disabled:cursor-default dark:bg-blue-950/40 dark:text-blue-300">#{tag}</button>
+            ))}
+          </div>
+        )}
+
+        <MessageBody html={message.text} detail={detail} href={href} onOpenDetail={onOpenDetail} />
+
+        <MessageMedia message={message} />
+
+        {message.reactions?.length ? (
+          <footer className="mt-4 flex flex-wrap items-center gap-2 border-t pt-3">
+            {message.reactions.map((reaction) => (
+              <span key={`${reaction.emoji}-${reaction.count}`} className="inline-flex h-7 items-center gap-1 rounded-full bg-muted px-2.5 text-xs"><span>{reaction.emoji}</span><span className="font-medium text-muted-foreground">{reaction.count}</span></span>
+            ))}
+          </footer>
+        ) : null}
+      </div>
+    </article>
+  );
+}

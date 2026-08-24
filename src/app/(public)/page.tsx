@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import ArchivePageClient from "./ArchivePageClient";
-import { getPublicMessages } from "@/lib/messages";
 
-export default async function Home() {
-  const messages = await getPublicMessages();
-
-  return <ArchivePageClient messages={messages} />;
+export default function Home() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+      <ArchivePageClient />
+    </Suspense>
+  );
 }

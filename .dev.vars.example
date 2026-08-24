@@ -1,0 +1,5 @@
+TELEGRAM_BOT_TOKEN=123456:replace-me
+TELEGRAM_WEBHOOK_SECRET=replace-with-a-long-random-value
+CF_ACCESS_TEAM_DOMAIN=https://replace-me.cloudflareaccess.com
+CF_ACCESS_AUD=replace-with-access-application-audience
+CF_ACCESS_ADMIN_EMAIL=admin@example.com

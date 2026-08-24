@@ -65,7 +65,6 @@ function parseMedia(
 ): TelegramMedia | null {
   const photo = message.find(".tgme_widget_message_photo_wrap").first();
   const photoUrl =
-    photo.attr("href") ||
     extractBackgroundImageUrl(photo.attr("style")) ||
     extractBackgroundImageUrl(photo.find(".tgme_widget_message_photo").attr("style"));
 

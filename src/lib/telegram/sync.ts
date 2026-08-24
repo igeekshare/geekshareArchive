@@ -1,24 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import { fetchTelegramChannelHtml } from "@/lib/telegram/fetch";
 import { parseTelegramChannelHtml } from "@/lib/telegram/parse";
+import { parseTelegramChannelProfileHtml } from "@/lib/telegram/profile";
 import type {
   ParsedTelegramMessage,
   TelegramSyncOptions,
   TelegramSyncResult,
 } from "@/lib/telegram/types";
-
-function normalizeUsername(username: string): string {
-  const normalized = username.replace(/^@/, "").trim();
-  if (!/^[A-Za-z0-9_]{3,}$/.test(normalized)) {
-    throw new Error(`Invalid Telegram channel username: "${username}"`);
-  }
-  return normalized;
-}
-
-function channelIdFor(username: string): string {
-  if (username.toLowerCase() === "xgeekshare") return "geekshare";
-  return username.toLowerCase();
-}
+import {
+  normalizeTelegramUsername,
+  telegramChannelIdFor,
+} from "@/lib/telegram/username";
 
 function messageIdFor(channelId: string, telegramMessageId: string): string {
   return channelId === "geekshare" || channelId === "xgeekshare"
@@ -52,8 +44,8 @@ export async function syncTelegramChannel(
   channelUsername: string,
   options: TelegramSyncOptions = {},
 ): Promise<TelegramSyncResult> {
-  const username = normalizeUsername(channelUsername);
-  const channelId = channelIdFor(username);
+  const username = normalizeTelegramUsername(channelUsername);
+  const channelId = telegramChannelIdFor(username);
   const source = `https://t.me/s/${username}`;
 
   const channel = await prisma.channel.upsert({
@@ -78,19 +70,34 @@ export async function syncTelegramChannel(
       channelId: channel.id,
       source,
       status: "running",
+      parsedCount: 0,
       importedCount: 0,
       updatedCount: 0,
       skippedCount: 0,
+      failedCount: 0,
     },
   });
 
   let importedCount = 0;
   let updatedCount = 0;
   let skippedCount = 0;
+  let failedCount = 0;
+  let parsedCount = 0;
 
   try {
     const { html, url } = await fetchTelegramChannelHtml(username, options);
     const parsed = parseTelegramChannelHtml(html);
+    let profile: ReturnType<typeof parseTelegramChannelProfileHtml> | null = null;
+    try {
+      profile = parseTelegramChannelProfileHtml(html, username);
+    } catch (error) {
+      console.warn(
+        `Could not refresh Telegram profile for @${username}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+    parsedCount = parsed.messages.length;
     skippedCount += parsed.skipped.length;
 
     for (const message of parsed.messages) {
@@ -124,7 +131,7 @@ export async function syncTelegramChannel(
           importedCount++;
         }
       } catch (error) {
-        skippedCount++;
+        failedCount++;
         console.warn(
           `Skipped Telegram message ${message.telegramMessageId}: ${
             error instanceof Error ? error.message : String(error)
@@ -133,17 +140,52 @@ export async function syncTelegramChannel(
       }
     }
 
-    await prisma.syncLog.update({
-      where: { id: syncLog.id },
-      data: {
-        source: url,
-        status: "success",
-        importedCount,
-        updatedCount,
-        skippedCount,
-        finishedAt: new Date(),
+    const latestParsedMessageId = parsed.messages.reduce<string | null>(
+      (latest, message) => {
+        if (!latest) return message.telegramMessageId;
+        return BigInt(message.telegramMessageId) > BigInt(latest)
+          ? message.telegramMessageId
+          : latest;
       },
-    });
+      null,
+    );
+    const lastSyncedMessageId =
+      channel.lastSyncedMessageId && latestParsedMessageId
+        ? BigInt(channel.lastSyncedMessageId) > BigInt(latestParsedMessageId)
+          ? channel.lastSyncedMessageId
+          : latestParsedMessageId
+        : channel.lastSyncedMessageId ?? latestParsedMessageId;
+
+    await prisma.$transaction([
+      prisma.channel.update({
+        where: { id: channel.id },
+        data: {
+          title:
+            profile && channel.title === username ? profile.title : channel.title,
+          description:
+            profile &&
+            channel.description === `Telegram public channel @${username}`
+              ? profile.description
+              : channel.description,
+          avatarUrl: channel.avatarUrl ?? profile?.avatarUrl,
+          lastSyncedAt: new Date(),
+          lastSyncedMessageId,
+        },
+      }),
+      prisma.syncLog.update({
+        where: { id: syncLog.id },
+        data: {
+          source: url,
+          status: failedCount > 0 ? "partial" : "success",
+          parsedCount,
+          importedCount,
+          updatedCount,
+          skippedCount,
+          failedCount,
+          finishedAt: new Date(),
+        },
+      }),
+    ]);
 
     return {
       channelId: channel.id,
@@ -152,7 +194,8 @@ export async function syncTelegramChannel(
       importedCount,
       updatedCount,
       skippedCount,
-      parsedCount: parsed.messages.length,
+      failedCount,
+      parsedCount,
       syncLogId: syncLog.id,
     };
   } catch (error) {
@@ -166,6 +209,8 @@ export async function syncTelegramChannel(
         importedCount,
         updatedCount,
         skippedCount,
+        parsedCount,
+        failedCount: Math.max(failedCount, 1),
         finishedAt: new Date(),
       },
     });

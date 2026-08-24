@@ -8,17 +8,21 @@ datasource db {
 }
 
 model Channel {
-  id          String    @id
-  slug        String    @unique
-  title       String
-  username    String?   @unique
-  telegramUrl String?
-  archiveUrl  String?
-  description String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  messages    Message[]
-  syncLogs    SyncLog[]
+  id                  String    @id
+  slug                String    @unique
+  title               String
+  username            String?   @unique
+  telegramUrl         String?
+  archiveUrl          String?
+  description         String?
+  avatarUrl           String?
+  enabled             Boolean   @default(true)
+  lastSyncedAt        DateTime?
+  lastSyncedMessageId String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  messages            Message[]
+  syncLogs            SyncLog[]
 
   @@map("channels")
 }
@@ -70,6 +74,8 @@ model SyncLog {
   importedCount Int       @default(0)
   updatedCount  Int       @default(0)
   skippedCount  Int       @default(0)
+  parsedCount   Int       @default(0)
+  failedCount   Int       @default(0)
   startedAt     DateTime  @default(now())
   finishedAt    DateTime?
 

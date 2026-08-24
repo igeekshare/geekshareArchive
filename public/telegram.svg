@@ -1,26 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!--
-  Placeholder Telegram brand icon wrapper.
-  This local SVG references the official icon served by Simple Icons CDN.
-  Replace this file with an official offline SVG when available.
--->
-<svg
-  xmlns="http://www.w3.org/2000/svg"
-  xmlns:xlink="http://www.w3.org/1999/xlink"
-  width="24"
-  height="24"
-  viewBox="0 0 24 24"
-  role="img"
-  aria-label="Telegram"
->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="Telegram">
   <title>Telegram</title>
-  <image
-    x="0"
-    y="0"
-    width="24"
-    height="24"
-    href="https://cdn.simpleicons.org/telegram/26A5E4"
-    xlink:href="https://cdn.simpleicons.org/telegram/26A5E4"
-    preserveAspectRatio="xMidYMid meet"
-  />
+  <path fill="#fff" d="M21.7 3.15 2.75 10.46c-1.29.52-1.28 1.25-.24 1.57l4.86 1.52 1.86 5.7c.23.65.12.91.8.91.52 0 .75-.24 1.04-.52l2.36-2.29 4.91 3.63c.9.5 1.56.24 1.78-.84l3.22-15.18c.33-1.32-.5-1.92-1.64-1.81ZM8.13 13.2l10.96-6.91c.55-.33 1.05-.15.64.22l-9.04 8.17-.35 3.68-2.21-5.16Z"/>
 </svg>

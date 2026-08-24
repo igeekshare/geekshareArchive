@@ -1,4 +1,5 @@
 import type { TelegramFetchOptions } from "@/lib/telegram/types";
+import { normalizeTelegramUsername } from "@/lib/telegram/username";
 
 const DEFAULT_TIMEOUT_MS = 15000;
 const DEFAULT_RETRIES = 2;
@@ -9,10 +10,7 @@ export function buildTelegramPublicUrl(
   channelUsername: string,
   options: Pick<TelegramFetchOptions, "before" | "after"> = {},
 ): string {
-  const username = channelUsername.replace(/^@/, "").trim();
-  if (!username) {
-    throw new Error("Telegram channel username is required.");
-  }
+  const username = normalizeTelegramUsername(channelUsername);
 
   const url = new URL(`https://t.me/s/${encodeURIComponent(username)}`);
   if (options.before) url.searchParams.set("before", options.before);
