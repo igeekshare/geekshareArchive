@@ -15,7 +15,6 @@ const navItems = [
   { label: "首页", href: "/" },
   { label: "频道", href: "/#channel" },
   { label: "话题", href: "/#topics" },
-  { label: "关于", href: "/#about" },
 ];
 
 type SiteHeaderProps = {
@@ -59,7 +58,7 @@ function HeaderSearch({
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
-      <kbd className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:block">
+      <kbd className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border bg-background px-1.5 py-0.5 font-mono text-xs text-muted-foreground sm:block">
         ⌘K
       </kbd>
     </form>
