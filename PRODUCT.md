@@ -59,7 +59,7 @@ GeekShare Archive 将 Telegram 频道的新推送、编辑、反应和媒体持�
 - 静态 Next.js 页面、Worker HTML 重写、动态站点配置和 Cloudflare Access 请求校验逻辑。
 - 2026-08-24 本地执行的 32 项测试、lint、typecheck、build、Assets 校验和 Wrangler dry-run 均通过。
 - 同日本地 D1 已应用 `0001`、`0002` 和 `0003` 三份 migration，包含 1 个演示频道和 10 条演示消息。
-- 同日本地 FTS 有 28 行，其中 9 个消息 ID 有重复索引；这是导入/索引流程的已知问题，不得被描述为已解决。
+- 2026-08-27 隔离 Local D1 回归测试验证同一份 10 条消息的快照连续导入后，`messages` 与 `messages_fts` 均保持 10 行且无重复 ID；`0004_rebuild_messages_fts.sql` 也将人为保留的 10 条消息 / 20 条 FTS 脏数据恢复为一一对应。
 
 上述证据证明仓库实现和本地构建状态，不证明远程 Cloudflare 资源、Webhook、Access、DNS、TLS 或生产数据当前健康。
 
