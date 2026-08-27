@@ -237,11 +237,12 @@ async function main() {
     );
     const status = media[0]?.archiveStatus ?? "none";
     statements.push(
-      `INSERT OR REPLACE INTO messages (` +
+      `INSERT INTO messages (` +
         `id, channel_id, origin_channel_id, telegram_message_id, source_url, date, datetime, published_at, ` +
         `published_year, published_month, sender, html, plain_text, media, reply_to, ` +
         `reactions, raw_payload, media_archive_status, status, admin_override, ` +
-        `admin_updated_at, admin_updated_by, created_at, updated_at) VALUES (` +
+        `admin_updated_at, admin_updated_by, display_title, display_summary, is_featured, ` +
+        `featured_order, engagement_score, created_at, updated_at) VALUES (` +
         [
           message.id,
           message.channelId,
@@ -265,12 +266,30 @@ async function main() {
           0,
           null,
           null,
+          null,
+          null,
+          0,
+          0,
+          0,
           message.createdAt.toISOString(),
           message.updatedAt.toISOString(),
         ]
           .map(sql)
           .join(", ") +
-        ");",
+        `) ON CONFLICT(id) DO UPDATE SET ` +
+        `channel_id = excluded.channel_id, origin_channel_id = excluded.origin_channel_id, ` +
+        `telegram_message_id = excluded.telegram_message_id, source_url = excluded.source_url, ` +
+        `date = excluded.date, datetime = excluded.datetime, published_at = excluded.published_at, ` +
+        `published_year = excluded.published_year, published_month = excluded.published_month, ` +
+        `sender = excluded.sender, html = excluded.html, plain_text = excluded.plain_text, ` +
+        `media = excluded.media, reply_to = excluded.reply_to, reactions = excluded.reactions, ` +
+        `raw_payload = excluded.raw_payload, media_archive_status = excluded.media_archive_status, ` +
+        `status = excluded.status, admin_override = excluded.admin_override, ` +
+        `admin_updated_at = excluded.admin_updated_at, admin_updated_by = excluded.admin_updated_by, ` +
+        `display_title = excluded.display_title, display_summary = excluded.display_summary, ` +
+        `is_featured = excluded.is_featured, featured_order = excluded.featured_order, ` +
+        `engagement_score = excluded.engagement_score, created_at = excluded.created_at, ` +
+        `updated_at = excluded.updated_at;`,
     );
     for (const tag of extractTags(text)) {
       statements.push(

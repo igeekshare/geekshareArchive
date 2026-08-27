@@ -78,7 +78,7 @@ npm run dev
 
 `npm run dev` 会构建静态站点并启动 Wrangler，使页面与 `/api/*` 使用同一服务。只调试静态 UI 时运行 `npm run dev:ui`；它不提供 Worker API、D1 或 R2。
 
-不要对同一 Local D1 反复导入演示 SQL。当前导出流程与 FTS triggers 的组合可能产生重复索引；验证完整导入时应使用干净的本地状态。
+对同一份演示快照重复执行 `npm run db:import-d1:local` 是幂等的：消息会按 archive ID 更新，FTS 索引保持每条消息一行。`0004_rebuild_messages_fts.sql` 会在应用 migration 时从 `messages` 重建已有 FTS 索引。
 
 ## Cloudflare 配置与部署
 
