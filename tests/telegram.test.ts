@@ -37,6 +37,7 @@ test("date and stable IDs preserve existing links", () => {
     month: "1970-01",
   });
   assert.equal(stableMessageId("geekshare", 42), "message42");
+  assert.equal(stableMessageId("xgeekshare", 42), "xgeekshare_42");
   assert.equal(stableMessageId("tl_gc", 42), "tl_gc_42");
 });
 

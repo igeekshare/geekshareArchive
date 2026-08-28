@@ -59,6 +59,7 @@ import {
   archiveMedia,
   archiveBotFile,
   extractTags,
+  MediaArchiveError,
   messageMedia,
   secretsMatch,
   shanghaiDate,
@@ -72,6 +73,18 @@ import {
 
 const PAGE_SIZE = 30;
 const MAX_PAGE_SIZE = 60;
+export const WEBHOOK_PROCESSING_LEASE_MS = 10 * 60 * 1000;
+export const MEDIA_MAX_RETRY_ATTEMPTS = 5;
+export const MEDIA_RETRY_DELAYS_MS = [
+  60 * 60 * 1000,
+  2 * 60 * 60 * 1000,
+  4 * 60 * 60 * 1000,
+  8 * 60 * 60 * 1000,
+] as const;
+
+export function mediaRetryDelayMs(failureCount: number): number | null {
+  return MEDIA_RETRY_DELAYS_MS[failureCount - 1] ?? null;
+}
 
 interface ChannelRow {
   id: string;
@@ -596,8 +609,16 @@ async function persistMessage(
   const time = shanghaiDate(message.date);
   const media = messageMedia(message);
   const archiveStatus = media.length ? "pending" : "none";
+  const replyTarget = message.reply_to_message
+    ? await env.DB.prepare(
+        `SELECT id FROM messages
+         WHERE COALESCE(origin_channel_id, channel_id) = ? AND telegram_message_id = ? LIMIT 1`,
+      )
+        .bind(channel.id, message.reply_to_message.message_id)
+        .first<{ id: string }>()
+    : null;
   const replyTo = message.reply_to_message
-    ? stableMessageId(channel.id, message.reply_to_message.message_id)
+    ? replyTarget?.id ?? stableMessageId(channel.id, message.reply_to_message.message_id)
     : null;
   const sourceUrl = `https://t.me/${channel.username}/${message.message_id}`;
   const tags = extractTags(text);
@@ -624,6 +645,10 @@ async function persistMessage(
          reply_to = excluded.reply_to,
          raw_payload = excluded.raw_payload,
          media_archive_status = excluded.media_archive_status,
+         media_retry_count = 0,
+         media_last_error = NULL,
+         media_next_retry_at = NULL,
+         media_retry_exhausted = 0,
          status = CASE WHEN messages.admin_override = 1 THEN messages.status ELSE 'published' END,
          updated_at = CURRENT_TIMESTAMP`,
     ).bind(
@@ -692,33 +717,54 @@ async function archiveAndUpdate(
   media: StoredMedia[],
 ): Promise<void> {
   if (!media.length) return;
+  let attempted = media;
   try {
-    const archived = await archiveMedia(
+    attempted = await archiveMedia(
       env,
       media,
       channel.id,
       channel.username,
       telegramMessageId,
     );
-    const status = archived.every((item) => item.archiveStatus === "archived")
+    const status = attempted.every((item) => item.archiveStatus === "archived")
       ? "archived"
-      : archived.some((item) => item.archiveStatus === "failed")
+      : attempted.some((item) => item.archiveStatus === "failed")
         ? "failed"
         : "external";
     await env.DB.prepare(
-      "UPDATE messages SET media = ?, media_archive_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+      `UPDATE messages SET media = ?, media_archive_status = ?,
+       media_retry_count = 0, media_last_error = NULL, media_next_retry_at = NULL,
+       media_retry_exhausted = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
     )
-      .bind(JSON.stringify(archived), status, id)
+      .bind(JSON.stringify(attempted), status, id)
       .run();
   } catch (error) {
-    const failed = media.map((item) => ({ ...item, archiveStatus: "failed" as const }));
+    const message = error instanceof Error ? error.message.slice(0, 500) : "Media archive failed";
+    const failed = error instanceof MediaArchiveError
+      ? error.media
+      : attempted.map((item) => ({ ...item, archiveStatus: "failed" as const }));
+    const current = await env.DB.prepare(
+      "SELECT media_retry_count FROM messages WHERE id = ?",
+    )
+      .bind(id)
+      .first<{ media_retry_count: number }>();
+    const failureCount = Number(current?.media_retry_count ?? 0) + 1;
+    const permanent = error instanceof MediaArchiveError && error.permanent;
+    const delay = mediaRetryDelayMs(failureCount);
+    const exhausted = permanent || failureCount >= MEDIA_MAX_RETRY_ATTEMPTS || delay === null;
+    const nextRetryAt = exhausted || delay === null
+      ? null
+      : new Date(Date.now() + delay).toISOString();
     await env.DB.batch([
       env.DB.prepare(
-        "UPDATE messages SET media = ?, media_archive_status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-      ).bind(JSON.stringify(failed), id),
+        `UPDATE messages SET media = ?, media_archive_status = 'failed',
+         media_retry_count = ?, media_last_error = ?, media_next_retry_at = ?,
+         media_retry_exhausted = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      ).bind(JSON.stringify(failed), failureCount, message, nextRetryAt, exhausted ? 1 : 0, id),
       env.DB.prepare(
-        "INSERT INTO sync_logs(channel_id, source, status, message) VALUES (?, 'media', 'failed', ?)",
-      ).bind(channel.id, error instanceof Error ? error.message.slice(0, 500) : "Media archive failed"),
+        `INSERT INTO sync_logs(channel_id, source, status, message, details)
+         VALUES (?, 'media', 'failed', ?, ?)`,
+      ).bind(channel.id, message, JSON.stringify({ failureCount, exhausted, permanent })),
     ]);
   }
 }
@@ -726,9 +772,12 @@ async function archiveAndUpdate(
 async function processReaction(
   env: Env,
   reaction: TelegramReactionUpdate,
-): Promise<ChannelRow | null> {
+): Promise<{ channel: ChannelRow | null; status: "success" | "ignored" }> {
   const channel = await channelForChat(env, reaction.chat);
-  if (!channel) return null;
+  if (!channel) return { channel: null, status: "ignored" };
+  if (await isTombstoned(env, channel, reaction.message_id)) {
+    return { channel, status: "ignored" };
+  }
   const reactions = reaction.reactions.map((item) => ({
     emoji:
       item.type.emoji ??
@@ -743,19 +792,62 @@ async function processReaction(
     (total, item) => total + Math.max(0, Number(item.total_count) || 0),
     0,
   );
-  await env.DB.batch([
+  const results = await env.DB.batch([
     env.DB.prepare(
-      "UPDATE messages SET reactions = ?, engagement_score = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+      `UPDATE messages SET reactions = ?, engagement_score = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE COALESCE(origin_channel_id, channel_id) = ? AND telegram_message_id = ?`,
     ).bind(
       JSON.stringify(reactions),
       engagementScore,
-      stableMessageId(channel.id, reaction.message_id),
+      channel.id,
+      reaction.message_id,
     ),
     env.DB.prepare(
       "UPDATE channels SET last_webhook_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
     ).bind(channel.id),
   ]);
-  return channel;
+  if ((results[0]?.meta.changes ?? 0) === 0) {
+    throw new Error("Reaction target message was not found");
+  }
+  return { channel, status: "success" };
+}
+
+async function claimWebhookUpdate(
+  env: Env,
+  updateId: string,
+): Promise<{ attemptCount: number } | null> {
+  const inserted = await env.DB.prepare(
+    `INSERT OR IGNORE INTO webhook_updates(
+       update_id, status, attempt_count, last_attempt_at
+     ) VALUES (?, 'processing', 1, CURRENT_TIMESTAMP)`,
+  )
+    .bind(updateId)
+    .run();
+  if ((inserted.meta.changes ?? 0) > 0) return { attemptCount: 1 };
+
+  const leaseMinutes = Math.floor(WEBHOOK_PROCESSING_LEASE_MS / 60_000);
+  const reclaimed = await env.DB.prepare(
+    `UPDATE webhook_updates
+     SET status = 'processing', error = NULL, processed_at = NULL,
+         attempt_count = attempt_count + 1, last_attempt_at = CURRENT_TIMESTAMP
+     WHERE update_id = ? AND (
+       status = 'failed' OR (
+         status = 'processing' AND (
+           last_attempt_at IS NULL OR
+           datetime(last_attempt_at) <= datetime(CURRENT_TIMESTAMP, ?)
+         )
+       )
+     )`,
+  )
+    .bind(updateId, `-${leaseMinutes} minutes`)
+    .run();
+  if ((reclaimed.meta.changes ?? 0) !== 1) return null;
+  const row = await env.DB.prepare(
+    "SELECT attempt_count FROM webhook_updates WHERE update_id = ?",
+  )
+    .bind(updateId)
+    .first<{ attempt_count: number }>();
+  return row ? { attemptCount: Number(row.attempt_count) } : null;
 }
 
 async function telegramWebhook(
@@ -778,25 +870,9 @@ async function telegramWebhook(
     return errorResponse(400, "Invalid JSON");
   }
   if (!Number.isInteger(update.update_id)) return errorResponse(400, "Missing update_id");
-
-  const inserted = await env.DB.prepare(
-    "INSERT OR IGNORE INTO webhook_updates(update_id, status) VALUES (?, 'processing')",
-  )
-    .bind(String(update.update_id))
-    .run();
-  if ((inserted.meta.changes ?? 0) === 0) {
-    const existing = await env.DB.prepare(
-      "SELECT status FROM webhook_updates WHERE update_id = ?",
-    )
-      .bind(String(update.update_id))
-      .first<{ status: string }>();
-    if (existing?.status !== "failed") return new Response(null, { status: 204 });
-    await env.DB.prepare(
-      "UPDATE webhook_updates SET status = 'processing', error = NULL WHERE update_id = ?",
-    )
-      .bind(String(update.update_id))
-      .run();
-  }
+  const updateId = String(update.update_id);
+  const claim = await claimWebhookUpdate(env, updateId);
+  if (!claim) return new Response(null, { status: 204 });
 
   try {
     const message = update.channel_post ?? update.edited_channel_post;
@@ -804,18 +880,20 @@ async function telegramWebhook(
       const channel = await channelForChat(env, message.chat);
       if (!channel) {
         await env.DB.prepare(
-          "UPDATE webhook_updates SET status = 'ignored', processed_at = CURRENT_TIMESTAMP WHERE update_id = ?",
+          `UPDATE webhook_updates SET status = 'ignored', processed_at = CURRENT_TIMESTAMP
+           WHERE update_id = ? AND status = 'processing' AND attempt_count = ?`,
         )
-          .bind(String(update.update_id))
+          .bind(updateId, claim.attemptCount)
           .run();
         return new Response(null, { status: 204 });
       }
       if (await isTombstoned(env, channel, message.message_id)) {
         await env.DB.prepare(
           `UPDATE webhook_updates SET channel_id = ?, telegram_message_id = ?,
-           status = 'ignored', processed_at = CURRENT_TIMESTAMP WHERE update_id = ?`,
+           status = 'ignored', processed_at = CURRENT_TIMESTAMP
+           WHERE update_id = ? AND status = 'processing' AND attempt_count = ?`,
         )
-          .bind(channel.id, message.message_id, String(update.update_id))
+          .bind(channel.id, message.message_id, updateId, claim.attemptCount)
           .run();
         return new Response(null, { status: 204 });
       }
@@ -831,37 +909,42 @@ async function telegramWebhook(
       else await archive;
       await env.DB.prepare(
         `UPDATE webhook_updates SET channel_id = ?, telegram_message_id = ?,
-         status = 'success', processed_at = CURRENT_TIMESTAMP WHERE update_id = ?`,
+         status = 'success', processed_at = CURRENT_TIMESTAMP
+         WHERE update_id = ? AND status = 'processing' AND attempt_count = ?`,
       )
-        .bind(channel.id, message.message_id, String(update.update_id))
+        .bind(channel.id, message.message_id, updateId, claim.attemptCount)
         .run();
     } else if (update.message_reaction_count) {
-      const channel = await processReaction(env, update.message_reaction_count);
+      const reaction = await processReaction(env, update.message_reaction_count);
       await env.DB.prepare(
         `UPDATE webhook_updates SET channel_id = ?, telegram_message_id = ?, status = ?,
-         processed_at = CURRENT_TIMESTAMP WHERE update_id = ?`,
+         processed_at = CURRENT_TIMESTAMP
+         WHERE update_id = ? AND status = 'processing' AND attempt_count = ?`,
       )
         .bind(
-          channel?.id ?? null,
+          reaction.channel?.id ?? null,
           update.message_reaction_count.message_id,
-          channel ? "success" : "ignored",
-          String(update.update_id),
+          reaction.status,
+          updateId,
+          claim.attemptCount,
         )
         .run();
     } else {
       await env.DB.prepare(
-        "UPDATE webhook_updates SET status = 'ignored', processed_at = CURRENT_TIMESTAMP WHERE update_id = ?",
+        `UPDATE webhook_updates SET status = 'ignored', processed_at = CURRENT_TIMESTAMP
+         WHERE update_id = ? AND status = 'processing' AND attempt_count = ?`,
       )
-        .bind(String(update.update_id))
+        .bind(updateId, claim.attemptCount)
         .run();
     }
     return new Response(null, { status: 204 });
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 500) : "Webhook failed";
     await env.DB.prepare(
-      "UPDATE webhook_updates SET status = 'failed', error = ?, processed_at = CURRENT_TIMESTAMP WHERE update_id = ?",
+      `UPDATE webhook_updates SET status = 'failed', error = ?, processed_at = CURRENT_TIMESTAMP
+       WHERE update_id = ? AND status = 'processing' AND attempt_count = ?`,
     )
-      .bind(message, String(update.update_id))
+      .bind(message, updateId, claim.attemptCount)
       .run();
     return errorResponse(500, "Webhook processing failed");
   }
@@ -1303,6 +1386,7 @@ async function configureTelegramWebhook(request: Request, env: Env): Promise<Res
 async function prepareMessageMediaRetry(
   env: Env,
   id: string,
+  manual = true,
 ): Promise<
   | { ok: false; status: number; error: string }
   | { ok: true; run: () => Promise<void> }
@@ -1318,12 +1402,18 @@ async function prepareMessageMediaRetry(
   if (!row) return { ok: false, status: 404, error: "Message not found" };
   const update = safeJsonParse<TelegramUpdate | null>(row.raw_payload, null);
   const message = update?.channel_post ?? update?.edited_channel_post;
-  const media = message ? messageMedia(message) : safeJsonParse<StoredMedia[]>(row.media, []);
+  const storedMedia = safeJsonParse<StoredMedia[]>(row.media, []);
+  const media = storedMedia.length ? storedMedia : message ? messageMedia(message) : [];
   if (!media.length) {
     return { ok: false, status: 409, error: "Message has no retryable Telegram media" };
   }
   await env.DB.prepare(
-    "UPDATE messages SET media_archive_status = 'pending', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+    manual
+      ? `UPDATE messages SET media_archive_status = 'pending', media_retry_count = 0,
+         media_last_error = NULL, media_next_retry_at = NULL, media_retry_exhausted = 0,
+         updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+      : `UPDATE messages SET media_archive_status = 'pending', media_next_retry_at = NULL,
+         updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
   )
     .bind(id)
     .run();
@@ -1333,8 +1423,8 @@ async function prepareMessageMediaRetry(
   };
 }
 
-async function retryMessageMedia(env: Env, id: string): Promise<Response> {
-  const prepared = await prepareMessageMediaRetry(env, id);
+async function retryMessageMedia(env: Env, id: string, manual = true): Promise<Response> {
+  const prepared = await prepareMessageMediaRetry(env, id, manual);
   if (!prepared.ok) return errorResponse(prepared.status, prepared.error);
   await prepared.run();
   const result = await env.DB.prepare(
@@ -1891,10 +1981,16 @@ export async function runHourlyMaintenance(env: Env): Promise<void> {
 
   const failed = await env.DB.prepare(
     `SELECT id FROM messages
-     WHERE media_archive_status IN ('pending', 'failed')
-     ORDER BY updated_at ASC LIMIT 1`,
+     WHERE status IN ('published', 'hidden')
+       AND media_archive_status IN ('pending', 'failed')
+       AND media_retry_exhausted = 0
+       AND (
+         media_next_retry_at IS NULL OR
+         datetime(media_next_retry_at) <= CURRENT_TIMESTAMP
+       )
+     ORDER BY COALESCE(media_next_retry_at, updated_at) ASC, updated_at ASC LIMIT 1`,
   ).first<{ id: string }>();
-  if (failed) await retryMessageMedia(env, failed.id);
+  if (failed) await retryMessageMedia(env, failed.id, false);
 
   const cleanup = await env.DB.prepare(
     `SELECT message_id FROM message_tombstones

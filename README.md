@@ -78,7 +78,7 @@ npm run dev
 
 `npm run dev` 会构建静态站点并启动 Wrangler，使页面与 `/api/*` 使用同一服务。只调试静态 UI 时运行 `npm run dev:ui`；它不提供 Worker API、D1 或 R2。
 
-对同一份演示快照重复执行 `npm run db:import-d1:local` 是幂等的：消息会按 archive ID 更新，FTS 索引保持每条消息一行。`0004_rebuild_messages_fts.sql` 会在应用 migration 时从 `messages` 重建已有 FTS 索引。
+对同一份演示快照重复执行 `npm run db:import-d1:local` 是幂等的：消息会按 archive ID 更新，FTS 索引保持每条消息一行。`0004_rebuild_messages_fts.sql` 会在应用 migration 时从 `messages` 重建已有 FTS 索引；`0005_webhook_media_reliability.sql` 为 Webhook lease 和有界媒体重试增加状态字段，不重命名现有消息 ID。
 
 ## Cloudflare 配置与部署
 
@@ -131,6 +131,13 @@ $env:TELEGRAM_BOT_TOKEN = "replace-me"
 $env:TELEGRAM_WEBHOOK_SECRET = "replace-with-a-long-random-value"
 npm run webhook:register
 ```
+
+Webhook 可靠性规则：
+
+- `update_id` 是 delivery identity；已完成或仍处于新鲜 lease 的重复 delivery 不会重复执行副作用，超过 10 分钟的 `processing` 可被原子 reclaim。
+- Telegram 消息以 `(origin_channel_id, telegram_message_id)` 定位；`messages.id` 仅是稳定的归档/公共 identity，已有 ID 在编辑、reaction 和重放时保持不变。
+- 正文先写入 D1，媒体随后归档到稳定 R2 key。失败按 1、2、4、8 小时退避，第 5 次失败后停止自动重试；管理员显式重试会解除 exhausted 状态。
+- thumbnail 失败会保留已归档主媒体并进入可恢复失败；当前不支持的大型 document/audio 等文件会记录明确原因并停止自动重试，不会被误标为 archived。
 
 ## API
 
