@@ -7,6 +7,10 @@ GeekShare Archive 是一个可自建的 Telegram 频道持久化归档。它用 
 
 仓库保留 GeekShare 作为默认演示品牌；站点名称、Logo、SEO 和频道可以在后台覆盖。[GeekShare 在线站点](https://archive.geekshare.org)仅用于展示，不是自建实例的默认部署目标。
 
+## 项目状态
+
+Phase 2 可靠性加固已于 2026-08-28 发布到 Production；Webhook、D1 migration、FTS 完整性以及站点/API smoke test 均已验证通过。Phase 2.4 暂缓，尚未完成真实 Telegram 媒体、缩略图故障恢复及 R2 PUT → D1 失败重试的端到端验证；详见 [PRODUCT.md](PRODUCT.md)。
+
 ## 功能
 
 - 归档 `channel_post`、编辑事件和消息反应，来源消息删除后仍可保留已归档内容。
