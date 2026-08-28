@@ -39,6 +39,10 @@ GeekShare Archive 将 Telegram 频道的新推送、编辑、反应和媒体持�
 - 有来源消息或展示消息关联的频道不可删除，只能停用。
 - 站点品牌和 SEO 配置保存在 D1，站点图片保存在 R2，由 Worker 在请求时读取和注入，无需重新构建。
 - Webhook 先持久化正文和原始 Update，再异步归档媒体；媒体失败不能导致正文丢失。
+- Webhook `update_id` 只表示 delivery；`processing` 使用 10 分钟 lease，过期 delivery 可以原子 reclaim，完成态和新鲜 processing 的重复 delivery 不重复执行。
+- Telegram 消息使用 `(origin_channel_id, telegram_message_id)` 作为来源身份，`messages.id` 作为稳定公共归档身份；已有公共 ID 不因同步算法变化而重命名。
+- 媒体自动恢复采用 1、2、4、8 小时退避并在第 5 次失败后停止；人工重试可以重置 exhausted 状态。
+- thumbnail 失败必须可观察并可补偿，已成功的主 R2 对象继续复用；当前不支持的大型文件类型以明确的永久失败结束，不能无限请求。
 - 数据模型、公共消息结构和消息卡片支持多附件展示；Webhook 对每个 Telegram Update 仍只选择一种主媒体，尚未合并 media group 相册消息。
 - 精确 `/admin` 只展示不含管理 UI 的品牌登录入口；后台页面和管理接口依赖 Cloudflare Access，Worker 验证 Access JWT，写操作额外校验同源 `Origin`。
 - 管理员可以编辑正文、标签、展示频道、发布时间和发布状态；后台覆盖优先于后续 Telegram 编辑。
@@ -60,6 +64,7 @@ GeekShare Archive 将 Telegram 频道的新推送、编辑、反应和媒体持�
 - 2026-08-24 本地执行的 32 项测试、lint、typecheck、build、Assets 校验和 Wrangler dry-run 均通过。
 - 同日本地 D1 已应用 `0001`、`0002` 和 `0003` 三份 migration，包含 1 个演示频道和 10 条演示消息。
 - 2026-08-27 隔离 Local D1 回归测试验证同一份 10 条消息的快照连续导入后，`messages` 与 `messages_fts` 均保持 10 行且无重复 ID；`0004_rebuild_messages_fts.sql` 也将人为保留的 10 条消息 / 20 条 FTS 脏数据恢复为一一对应。
+- 2026-08-28 本地 57 项测试验证 Webhook lease/reclaim、跨频道消息身份、reaction 延迟重试、管理员覆盖、FTS 重放、媒体退避/耗尽、thumbnail 补偿以及 `0005` fresh/upgrade migration；同日 lint、typecheck、build、Assets 校验和 Wrangler dry-run 通过。
 
 上述证据证明仓库实现和本地构建状态，不证明远程 Cloudflare 资源、Webhook、Access、DNS、TLS 或生产数据当前健康。
 

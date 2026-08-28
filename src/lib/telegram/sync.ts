@@ -13,7 +13,7 @@ import {
 } from "@/lib/telegram/username";
 
 function messageIdFor(channelId: string, telegramMessageId: string): string {
-  return channelId === "geekshare" || channelId === "xgeekshare"
+  return channelId === "geekshare"
     ? `message${telegramMessageId}`
     : `${channelId}_${telegramMessageId}`;
 }

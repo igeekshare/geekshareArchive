@@ -59,6 +59,17 @@ export interface TelegramUpdate {
   message_reaction_count?: TelegramReactionUpdate;
 }
 
+export class MediaArchiveError extends Error {
+  constructor(
+    message: string,
+    readonly media: StoredMedia[],
+    readonly permanent = false,
+  ) {
+    super(message);
+    this.name = "MediaArchiveError";
+  }
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -171,7 +182,7 @@ export function shanghaiDate(epochSeconds: number): {
 }
 
 export function stableMessageId(channelId: string, telegramMessageId: number): string {
-  return channelId === "geekshare" || channelId === "xgeekshare"
+  return channelId === "geekshare"
     ? `message${telegramMessageId}`
     : `${channelId}_${telegramMessageId}`;
 }
@@ -360,34 +371,30 @@ async function archiveThumbnail(
   telegramMessageId: number,
 ): Promise<string | undefined> {
   if (!item.thumbFileId || !item.thumbFileUniqueId) return item.thumbKey;
-  try {
-    const file = await telegramApi<{ file_path?: string; file_size?: number }>(
-      env,
-      "getFile",
-      { file_id: item.thumbFileId },
-    );
-    if (!file.file_path || (file.file_size ?? item.thumbSize ?? 0) > TELEGRAM_FILE_LIMIT) {
-      return item.thumbKey;
-    }
-    const thumbnail: StoredMedia = {
-      type: "photo",
-      archiveStatus: "pending",
-      mimeType: item.thumbMimeType ?? "image/jpeg",
-    };
-    const key = `channels/${channelId}/${telegramMessageId}/${item.thumbFileUniqueId}.${extensionFor(
-      file.file_path,
-      thumbnail,
-    )}`;
-    await streamToR2(
-      env,
-      key,
-      `https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${file.file_path}`,
-      thumbnail.mimeType,
-    );
-    return key;
-  } catch {
-    return item.thumbKey;
+  const file = await telegramApi<{ file_path?: string; file_size?: number }>(
+    env,
+    "getFile",
+    { file_id: item.thumbFileId },
+  );
+  if (!file.file_path || (file.file_size ?? item.thumbSize ?? 0) > TELEGRAM_FILE_LIMIT) {
+    throw new Error("Telegram thumbnail is unavailable through getFile");
   }
+  const thumbnail: StoredMedia = {
+    type: "photo",
+    archiveStatus: "pending",
+    mimeType: item.thumbMimeType ?? "image/jpeg",
+  };
+  const key = `channels/${channelId}/${telegramMessageId}/${item.thumbFileUniqueId}.${extensionFor(
+    file.file_path,
+    thumbnail,
+  )}`;
+  await streamToR2(
+    env,
+    key,
+    `https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${file.file_path}`,
+    thumbnail.mimeType,
+  );
+  return key;
 }
 
 export async function archiveMedia(
@@ -398,31 +405,38 @@ export async function archiveMedia(
   telegramMessageId: number,
 ): Promise<StoredMedia[]> {
   const archived: StoredMedia[] = [];
-  for (const item of media) {
-    if (item.archiveStatus === "external" || item.archiveStatus === "archived") {
-      archived.push(item);
-      continue;
-    }
-    if (!item.fileId || !item.fileUniqueId) {
-      throw new Error("Telegram media file identifier is missing");
-    }
-    const keyPrefix = `channels/${channelId}/${telegramMessageId}/${item.fileUniqueId}`;
-    let result: StoredMedia;
-    if ((item.size ?? 0) > TELEGRAM_FILE_LIMIT) {
-      result = await archiveFromEmbed(
-        env,
-        item,
-        channelUsername,
-        telegramMessageId,
-        keyPrefix,
-      );
-    } else {
-      const file = await telegramApi<{ file_path?: string; file_size?: number }>(
-        env,
-        "getFile",
-        { file_id: item.fileId },
-      );
-      if (!file.file_path || (file.file_size ?? 0) > TELEGRAM_FILE_LIMIT) {
+  for (let index = 0; index < media.length; index += 1) {
+    const item = media[index];
+    let result: StoredMedia | undefined;
+    try {
+      const thumbnailMissing = Boolean(item.thumbFileId && item.thumbFileUniqueId && !item.thumbKey);
+      if (
+        item.archiveStatus === "external" ||
+        (item.archiveStatus === "archived" && !thumbnailMissing)
+      ) {
+        archived.push(item);
+        continue;
+      }
+      if (item.r2Key && thumbnailMissing && await env.MEDIA.head(item.r2Key)) {
+        archived.push({
+          ...item,
+          thumbKey: await archiveThumbnail(env, item, channelId, telegramMessageId),
+          archiveStatus: "archived",
+        });
+        continue;
+      }
+      if (!item.fileId || !item.fileUniqueId) {
+        throw new Error("Telegram media file identifier is missing");
+      }
+      const keyPrefix = `channels/${channelId}/${telegramMessageId}/${item.fileUniqueId}`;
+      if ((item.size ?? 0) > TELEGRAM_FILE_LIMIT) {
+        if (item.type === "file") {
+          throw new MediaArchiveError(
+            "Oversized Telegram file media is unsupported by the current embed fallback",
+            [],
+            true,
+          );
+        }
         result = await archiveFromEmbed(
           env,
           item,
@@ -431,32 +445,60 @@ export async function archiveMedia(
           keyPrefix,
         );
       } else {
-        const extension = extensionFor(file.file_path, item);
-        const key = `${keyPrefix}.${extension}`;
-        const stored = await streamToR2(
+        const file = await telegramApi<{ file_path?: string; file_size?: number }>(
           env,
-          key,
-          `https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${file.file_path}`,
-          item.mimeType,
+          "getFile",
+          { file_id: item.fileId },
         );
-        result = {
-          ...item,
-          r2Key: key,
-          size: stored.size ?? file.file_size ?? item.size,
-          mimeType: stored.mimeType ?? item.mimeType,
-          archiveStatus: "archived",
-        };
+        if (!file.file_path || (file.file_size ?? 0) > TELEGRAM_FILE_LIMIT) {
+          if ((file.file_size ?? 0) > TELEGRAM_FILE_LIMIT && item.type === "file") {
+            throw new MediaArchiveError(
+              "Oversized Telegram file media is unsupported by the current embed fallback",
+              [],
+              true,
+            );
+          }
+          result = await archiveFromEmbed(
+            env,
+            item,
+            channelUsername,
+            telegramMessageId,
+            keyPrefix,
+          );
+        } else {
+          const extension = extensionFor(file.file_path, item);
+          const key = `${keyPrefix}.${extension}`;
+          const stored = await streamToR2(
+            env,
+            key,
+            `https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${file.file_path}`,
+            item.mimeType,
+          );
+          result = {
+            ...item,
+            r2Key: key,
+            size: stored.size ?? file.file_size ?? item.size,
+            mimeType: stored.mimeType ?? item.mimeType,
+            archiveStatus: "archived",
+          };
+        }
       }
+      archived.push({
+        ...result,
+        thumbKey: await archiveThumbnail(env, item, channelId, telegramMessageId),
+      });
+    } catch (error) {
+      const partial = result ?? item;
+      throw new MediaArchiveError(
+        error instanceof Error ? error.message : "Media archive failed",
+        [
+          ...archived,
+          { ...partial, archiveStatus: "failed" },
+          ...media.slice(index + 1),
+        ],
+        error instanceof MediaArchiveError && error.permanent,
+      );
     }
-    archived.push({
-      ...result,
-      thumbKey: await archiveThumbnail(
-        env,
-        item,
-        channelId,
-        telegramMessageId,
-      ),
-    });
   }
   return archived;
 }
