@@ -28,6 +28,7 @@ export type PublicMessage = {
   plainText: string;
   title: string;
   titleHtml?: string;
+  titleUrl?: string;
   summary: string;
   tags: string[];
   media: PublicMedia | null;

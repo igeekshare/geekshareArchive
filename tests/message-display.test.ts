@@ -71,6 +71,7 @@ test("Wake post becomes a rich title, lowercase tag, and signature-free body", (
   const message = messageRowToPublic(messageRow({ html, plain_text: plainText, tags: '["macos"]' }), "");
 
   assert.equal(message.title, `🧠 ${title}`);
+  assert.equal(message.titleUrl, "https://github.com/iAmCorey/Wake");
   assert.match(message.titleHtml ?? "", /<strong>🧠&nbsp;<\/strong>/);
   assert.doesNotMatch(message.titleHtml ?? "", /<a(?:\s|>)/i);
   assert.deepEqual(message.tags, ["macos"]);
@@ -89,6 +90,22 @@ test("standalone tag lines are removed while inline hashtags stay in the body", 
   assert.equal(presentation.titleHtml, "<strong>标题</strong>");
   assert.equal(presentation.bodyPlainText, "正文中的 #标签\n结尾");
   assert.equal(presentation.bodyHtml, "<strong>正文中的 #标签</strong><br>结尾");
+  assert.equal(presentation.titleUrl, undefined);
+});
+
+test("title extraction skips unsafe and malformed links", () => {
+  const unsafe = deriveMessagePresentation(
+    '<a href="javascript:alert(1)">标题</a><br>正文',
+    "标题\n正文",
+  );
+  const firstSafe = deriveMessagePresentation(
+    '<a href="javascript:alert(1)">标题</a> <a href="https://example.com/path?a=1&amp;b=2">官网</a><br>正文',
+    "标题 官网\n正文",
+  );
+
+  assert.equal(unsafe.titleUrl, undefined);
+  assert.equal(firstSafe.titleUrl, "https://example.com/path?a=1&b=2");
+  assert.doesNotMatch(firstSafe.titleHtml, /<a(?:\s|>)/i);
 });
 
 test("only a trailing channel signature block is removed", () => {
@@ -127,6 +144,7 @@ test("long rich titles are truncated without leaving open markup", () => {
   );
   assert.ok([...presentation.title].length <= 73);
   assert.match(presentation.title, /…$/);
+  assert.equal(presentation.titleUrl, "https://example.com/");
   assert.match(presentation.titleHtml, /…<\/strong>$/);
   assert.doesNotMatch(presentation.titleHtml, /<a(?:\s|>)/i);
   assert.equal(presentation.bodyPlainText, "正文");
@@ -143,7 +161,7 @@ test("empty text falls back to a media title and empty body", () => {
 
 test("manual titles stay escaped while the admin view keeps the original Telegram body", () => {
   const row = messageRow({
-    html: "#macOS<br><strong>来源标题</strong><br>公开正文<br>📮投稿 📢频道 💬吹水 🌐网站",
+    html: '#macOS<br><a href="https://example.com/original"><strong>来源标题</strong></a><br>公开正文<br>📮投稿 📢频道 💬吹水 🌐网站',
     plain_text: "#macOS\n来源标题\n公开正文\n📮投稿 📢频道 💬吹水 🌐网站",
     display_title: "<管理标题>",
   });
@@ -152,6 +170,7 @@ test("manual titles stay escaped while the admin view keeps the original Telegra
 
   assert.equal(publicMessage.title, "<管理标题>");
   assert.equal(publicMessage.titleHtml, "&lt;管理标题&gt;");
+  assert.equal(publicMessage.titleUrl, "https://example.com/original");
   assert.equal(publicMessage.plainText, "公开正文");
   assert.equal(adminMessage.plainText, row.plain_text);
   assert.equal(adminMessage.text, row.html);

@@ -75,6 +75,7 @@ export interface PublicMessage {
   plainText: string;
   title: string;
   titleHtml?: string;
+  titleUrl?: string;
   summary: string;
   tags: string[];
   media: PublicMedia | null;
@@ -105,6 +106,7 @@ type PresentationLine = {
 export type MessagePresentation = {
   title: string;
   titleHtml: string;
+  titleUrl?: string;
   bodyHtml: string;
   bodyPlainText: string;
 };
@@ -242,6 +244,19 @@ function flattenTitleLinks(value: string): string {
   return html.trim();
 }
 
+function firstSafeTitleUrl(value: string): string | undefined {
+  for (const match of value.matchAll(/<a\b[^>]*\bhref\s*=\s*(?:"([^"]*)"|'([^']*)')[^>]*>/giu)) {
+    const href = decodeHtmlEntities(match[1] ?? match[2] ?? "").trim();
+    try {
+      const url = new URL(href);
+      if (["http:", "https:", "tg:", "mailto:"].includes(url.protocol)) return url.toString();
+    } catch {
+      // Ignore malformed title links and keep looking for the first safe one.
+    }
+  }
+  return undefined;
+}
+
 function truncateHtml(value: string, limit: number): { html: string; text: string } {
   const completeText = normalizedTitleText(
     splitPresentationLines(value).map((line) => line.text).join(" "),
@@ -317,6 +332,7 @@ export function deriveMessagePresentation(html: string, plainText: string): Mess
   }
 
   const richTitle = truncateHtml(contentLines[titleIndex].html, 72);
+  const titleUrl = firstSafeTitleUrl(contentLines[titleIndex].html);
   const bodyLines = trimEmptyLines([
     ...contentLines.slice(0, titleIndex),
     ...contentLines.slice(titleIndex + 1),
@@ -325,6 +341,7 @@ export function deriveMessagePresentation(html: string, plainText: string): Mess
   return {
     title: richTitle.text || "媒体内容",
     titleHtml: flattenTitleLinks(richTitle.html) || "媒体内容",
+    ...(titleUrl ? { titleUrl } : {}),
     bodyHtml: bodyLines.map((line) => line.html).join("<br>").trim(),
     bodyPlainText: bodyLines.map((line) => line.text).join("\n").trim(),
   };
@@ -388,6 +405,7 @@ export function messageRowToPublic(
     plainText: publicContent ? presentation.bodyPlainText : row.plain_text,
     title,
     titleHtml,
+    titleUrl: presentation.titleUrl,
     summary: row.display_summary?.trim() || deriveDisplaySummary(presentation.bodyPlainText),
     tags: safeJsonParse<string[]>(row.tags, []),
     media: media[0] ?? null,
