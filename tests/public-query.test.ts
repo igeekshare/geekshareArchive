@@ -10,6 +10,7 @@ import {
   parseMessageCursor,
   parseMessageSort,
 } from "../src/cloudflare/public-query";
+import { visiblePageNumbers } from "../src/lib/utils";
 
 test("public list options only accept documented categories and sort orders", () => {
   assert.equal(parseMessageCategory(null), "all");
@@ -30,6 +31,15 @@ test("message cursors round-trip and reject malformed state", () => {
   assert.deepEqual(parseMessageCursor(encodeMessageCursor(cursor)), cursor);
   assert.equal(parseMessageCursor(null), null);
   assert.equal(parseMessageCursor("not-a-cursor"), undefined);
+});
+
+test("pagination shows at most five consecutive normalized page numbers", () => {
+  assert.deepEqual(visiblePageNumbers(1, 2), [1, 2]);
+  assert.deepEqual(visiblePageNumbers(1, 9), [1, 2, 3, 4, 5]);
+  assert.deepEqual(visiblePageNumbers(5, 9), [3, 4, 5, 6, 7]);
+  assert.deepEqual(visiblePageNumbers(9, 9), [5, 6, 7, 8, 9]);
+  assert.deepEqual(visiblePageNumbers(99, 9), [5, 6, 7, 8, 9]);
+  assert.deepEqual(visiblePageNumbers(-5, 9), [1, 2, 3, 4, 5]);
 });
 
 test("message categories map to their stored message signals", () => {

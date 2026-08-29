@@ -90,7 +90,9 @@ test("detail cards keep the same content order without clamping or summary dupli
   assert.doesNotMatch(html, /这段摘要不应出现在帖子卡片中/);
   assert.doesNotMatch(html, /<h1[^>]*>\s*<a/);
   assert.match(html, /href="https:\/\/github\.com\/iAmCorey\/Wake"[^>]*target="_blank"[^>]*rel="noopener noreferrer"/);
-  assert.match(html, /打开原标题链接 · github\.com/);
+  assert.match(html, /aria-label="打开原标题链接：github\.com"/);
+  assert.match(html, />github\.com<\/span>/);
+  assert.doesNotMatch(html, /打开原标题链接 ·/);
 });
 
 test("detail cards omit the original-title action when no title link exists", () => {
@@ -99,5 +101,5 @@ test("detail cards omit the original-title action when no title link exists", ()
     mode: "detail",
   }));
 
-  assert.doesNotMatch(html, /打开原标题链接/);
+  assert.doesNotMatch(html, /aria-label="打开原标题链接：/);
 });
