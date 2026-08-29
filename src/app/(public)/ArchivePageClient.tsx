@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowUp, LoaderCircle, Search, X } from "lucide-react";
-import AnimatedNumber from "@/components/AnimatedNumber";
+import { ArrowUp, ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import SiteHeader from "@/components/SiteHeader";
 import MessageCard from "@/components/MessageCard";
 import ArchiveToolbar from "@/components/home/ArchiveToolbar";
@@ -13,12 +12,13 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ArchiveMeta, HomepageData, MessageCategory, MessageListResponse, MessageSort, PublicMessage } from "@/lib/messages";
 import { DEFAULT_PUBLIC_SITE_CONFIG, type PublicSiteConfig } from "@/lib/site-config";
+import { visiblePageNumbers } from "@/lib/utils";
 
 const categories: MessageCategory[] = ["all", "visual", "link", "interactive", "file"];
 const sorts: MessageSort[] = ["newest", "oldest", "featured", "hot"];
 const RESTORE_KEY = "geekshare:feed-position";
 
-type RestoreState = { search: string; scrollY: number; loadedCount: number };
+type RestoreState = { search: string; scrollY: number };
 
 function preferredScrollBehavior(): ScrollBehavior {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
@@ -50,11 +50,9 @@ export default function ArchivePageClient() {
   const [meta, setMeta] = useState<ArchiveMeta>({ tags: [], years: [], monthsByYear: {} });
   const [homepage, setHomepage] = useState<HomepageData | null>(null);
   const [siteConfig, setSiteConfig] = useState<PublicSiteConfig>(DEFAULT_PUBLIC_SITE_CONFIG);
-  const [total, setTotal] = useState(0);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [hasLoadedMessages, setHasLoadedMessages] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [homepageLoading, setHomepageLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") ?? "");
@@ -69,7 +67,8 @@ export default function ArchivePageClient() {
   const activeChannel = searchParams.get("channel");
   const category = paramCategory(searchParams.get("category"));
   const sort = paramSort(searchParams.get("sort"));
-  const legacyPage = Math.max(1, Number.parseInt(searchParams.get("page") ?? "1", 10) || 1);
+  const pageParam = searchParams.get("page");
+  const requestedPage = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
   const filterKey = searchParams.toString();
   const discoveryVisible = !query && !activeTag && !activeYear && !activeMonth && !activeChannel && category === "all" && sort === "newest";
 
@@ -104,15 +103,15 @@ export default function ArchivePageClient() {
   }, []);
 
   const buildParams = useCallback(() => {
-    const params = new URLSearchParams({ category, sort, limit: String(Math.min(60, Math.max(30, restoreState?.loadedCount ?? 30))) });
-    if (legacyPage > 1) params.set("page", String(legacyPage));
+    const params = new URLSearchParams({ category, sort, limit: "10" });
+    if (requestedPage > 1) params.set("page", String(requestedPage));
     if (query) params.set("q", query);
     if (activeTag) params.set("tag", activeTag);
     if (activeYear) params.set("year", activeYear);
     if (activeMonth) params.set("month", activeMonth);
     if (activeChannel) params.set("channel", activeChannel);
     return params;
-  }, [activeChannel, activeMonth, activeTag, activeYear, category, legacyPage, query, restoreState?.loadedCount, sort]);
+  }, [activeChannel, activeMonth, activeTag, activeYear, category, query, requestedPage, sort]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -125,9 +124,16 @@ export default function ArchivePageClient() {
       })
       .then((data) => {
         setMessages(data.items);
-        setTotal(data.total);
-        setNextCursor(data.nextCursor);
-        setHasLoadedMessages(true);
+        setCurrentPage(data.page);
+        setTotalPages(data.totalPages);
+        const canonicalPageParam = data.page > 1 ? String(data.page) : null;
+        if (pageParam !== canonicalPageParam) {
+          const next = new URLSearchParams(filterKey);
+          if (canonicalPageParam) next.set("page", canonicalPageParam);
+          else next.delete("page");
+          const suffix = next.toString();
+          router.replace(suffix ? `/?${suffix}` : "/", { scroll: false });
+        }
         if (restoreState && !restoredRef.current) {
           restoredRef.current = true;
           window.requestAnimationFrame(() => window.requestAnimationFrame(() => window.scrollTo({ top: restoreState.scrollY, behavior: "auto" })));
@@ -139,7 +145,7 @@ export default function ArchivePageClient() {
       })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [buildParams, filterKey, restoreState]);
+  }, [buildParams, filterKey, pageParam, restoreState, router]);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 520);
@@ -148,13 +154,23 @@ export default function ArchivePageClient() {
   }, []);
 
   const rememberPosition = useCallback(() => {
-    sessionStorage.setItem(RESTORE_KEY, JSON.stringify({ search: window.location.search, scrollY: window.scrollY, loadedCount: messages.length } satisfies RestoreState));
-  }, [messages.length]);
+    sessionStorage.setItem(RESTORE_KEY, JSON.stringify({ search: window.location.search, scrollY: window.scrollY } satisfies RestoreState));
+  }, []);
 
   const scrollToFeed = useCallback(() => {
     const y = (feedRef.current?.getBoundingClientRect().top ?? 0) + window.scrollY - (window.innerWidth < 768 ? 176 : 120);
     window.scrollTo({ top: Math.max(0, y), behavior: preferredScrollBehavior() });
   }, []);
+
+  const changePage = useCallback((page: number) => {
+    if (page === currentPage) return;
+    const next = new URLSearchParams(searchParams.toString());
+    if (page > 1) next.set("page", String(page));
+    else next.delete("page");
+    const suffix = next.toString();
+    router.push(suffix ? `/?${suffix}` : "/", { scroll: false });
+    window.setTimeout(scrollToFeed, 40);
+  }, [currentPage, router, scrollToFeed, searchParams]);
 
   const selectTag = useCallback((tag: string) => {
     updateParams({ tag: activeTag === tag ? null : tag });
@@ -171,46 +187,24 @@ export default function ArchivePageClient() {
     document.getElementById(replyId)?.scrollIntoView({ behavior: preferredScrollBehavior(), block: "center" });
   }, [messageIds, rememberPosition]);
 
-  const loadMore = async () => {
-    if (!nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const params = buildParams();
-      params.delete("page");
-      params.set("limit", "30");
-      params.set("cursor", nextCursor);
-      const response = await fetch(`/api/messages?${params}`, { cache: "no-store" });
-      if (!response.ok) throw new Error("load more failed");
-      const data = await response.json() as MessageListResponse;
-      setMessages((current) => {
-        const known = new Set(current.map((item) => item.id));
-        return [...current, ...data.items.filter((item) => !known.has(item.id))];
-      });
-      setNextCursor(data.nextCursor);
-    } catch {
-      setLoadError("加载更多失败，请稍后重试。");
-    } finally {
-      setLoadingMore(false);
-    }
-  };
-
   const clearAll = () => updateParams({ q: null, tag: null, year: null, month: null, channel: null, category: null, sort: null });
   const filtersActive = !discoveryVisible;
   const telegramUrl = homepage?.channels.find((channel) => channel.enabled)?.telegramUrl ?? homepage?.channels[0]?.telegramUrl;
+  const pageNumbers = visiblePageNumbers(currentPage, totalPages);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_50%_-15%,rgba(59,130,246,0.06),transparent_30%)]">
       <SiteHeader searchValue={searchQuery} onSearchChange={setSearchQuery} onSearchSubmit={(value) => updateParams({ q: value.trim() })} branding={siteConfig.branding} telegramUrl={telegramUrl} />
 
-      <main className="mx-auto max-w-[1276px] px-4 pb-20 pt-3 sm:pt-5 min-[1300px]:px-0">
+      <main className="mx-auto max-w-[1120px] px-4 pb-20 pt-3 sm:pt-5">
         <h1 className="sr-only">{siteConfig.branding.siteName}归档</h1>
         <div className="space-y-3 sm:space-y-4">
           <div id="channel"><ChannelStrip data={homepage} loading={homepageLoading} activeChannel={activeChannel} onChannelChange={(channelId) => updateParams({ channel: channelId })} /></div>
           {discoveryVisible && <DiscoverySpotlight data={homepage} loading={homepageLoading} onOpenMessage={rememberPosition} />}
         </div>
 
-        <div className="mt-4 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-7">
-          <section id="feed" ref={feedRef} className="min-h-[60vh] scroll-mt-40 md:scroll-mt-28" aria-label="最新内容">
+        <div className="mt-4 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <section id="feed" ref={feedRef} className="min-w-0 min-h-[60vh] scroll-mt-40 md:scroll-mt-28" aria-label="最新内容">
             <div className="sticky top-[116px] z-40 -mx-1 bg-background/92 px-1 py-2 backdrop-blur md:top-[60px]">
               <ArchiveToolbar
                 category={category} sort={sort} tags={meta.tags} years={meta.years} monthsByYear={meta.monthsByYear}
@@ -224,19 +218,7 @@ export default function ArchivePageClient() {
               />
             </div>
 
-            <div className="mb-3 flex min-h-8 items-end justify-between gap-3 px-1">
-              <div>
-                <h2 className="text-lg font-extrabold">{sort === "hot" ? "本周热门" : sort === "featured" ? "编辑精选" : sort === "oldest" ? "从最早开始" : "最新内容"}</h2>
-                {hasLoadedMessages ? (
-                  <p className={`mt-0.5 text-xs text-muted-foreground transition-opacity motion-reduce:transition-none ${loading ? "opacity-55" : "opacity-100"}`} aria-busy={loading} aria-live="polite">
-                    共 <AnimatedNumber value={total} /> 条内容
-                  </p>
-                ) : loading ? (
-                  <Skeleton className="mt-1 h-3 w-20" />
-                ) : null}
-              </div>
-              {filtersActive && <Button variant="ghost" size="sm" onClick={clearAll} className="text-muted-foreground"><X />清除条件</Button>}
-            </div>
+            {filtersActive && <div className="mb-3 flex justify-end px-1"><Button variant="ghost" size="sm" onClick={clearAll} className="text-muted-foreground"><X />清除条件</Button></div>}
 
             {loadError && messages.length === 0 ? (
               <div className="rounded-xl border bg-card py-24 text-center text-sm text-destructive">{loadError}</div>
@@ -255,10 +237,24 @@ export default function ArchivePageClient() {
               </div>
             )}
 
-            {messages.length > 0 && nextCursor && (
-              <div className="mt-5 flex justify-center">
-                <Button variant="outline" className="min-w-36" onClick={() => void loadMore()} disabled={loadingMore}>{loadingMore ? <><LoaderCircle className="animate-spin" />加载中</> : "加载更多"}</Button>
-              </div>
+            {!loading && messages.length > 0 && totalPages > 1 && (
+              <nav aria-label="内容分页" className="mt-6 flex items-center justify-center gap-1">
+                <Button variant="outline" size="icon" aria-label="上一页" disabled={currentPage <= 1} onClick={() => changePage(currentPage - 1)}><ChevronLeft /></Button>
+                {pageNumbers.map((page) => (
+                  <Button
+                    key={page}
+                    variant={page === currentPage ? "default" : "outline"}
+                    size="icon"
+                    aria-label={`第 ${page} 页`}
+                    aria-current={page === currentPage ? "page" : undefined}
+                    className="tabular-nums"
+                    onClick={() => changePage(page)}
+                  >
+                    {page}
+                  </Button>
+                ))}
+                <Button variant="outline" size="icon" aria-label="下一页" disabled={currentPage >= totalPages} onClick={() => changePage(currentPage + 1)}><ChevronRight /></Button>
+              </nav>
             )}
             {loadError && messages.length > 0 && <p className="mt-3 text-center text-sm text-destructive">{loadError}</p>}
           </section>

@@ -137,6 +137,7 @@ body {
   background: hsl(var(--background));
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   min-width: 320px;
+  overflow-x: clip;
 }
 
 .site-header {

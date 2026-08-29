@@ -214,6 +214,7 @@ export default function MessageCard({ message, mode = "feed", onScrollToReply, o
   const initial = message.channel.title?.charAt(0) || message.from?.charAt(0) || "极";
   const richTitle = message.titleHtml?.trim();
   const richTitleClassName = "break-words";
+  const titleUrlLabel = message.titleUrl ? titleLinkLabel(message.titleUrl) : null;
 
   const copyLink = async () => {
     try {
@@ -256,24 +257,26 @@ export default function MessageCard({ message, mode = "feed", onScrollToReply, o
 
       <div className="mt-3 sm:mt-4">
         {detail ? (
-          <>
-            <h1 className="text-balance text-2xl font-extrabold leading-[1.32] tracking-[-0.02em] sm:text-[2rem]">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+            <h1 className="min-w-0 text-balance text-2xl font-extrabold leading-[1.32] tracking-[-0.02em] sm:text-[2rem]">
               {richTitle
                 ? <span className={richTitleClassName} dangerouslySetInnerHTML={{ __html: richTitle }} />
                 : message.title}
             </h1>
-            {message.titleUrl && (
-              <a
-                href={message.titleUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-md text-sm font-semibold text-blue-600 underline-offset-4 transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-blue-300"
-              >
-                <span className="truncate">打开原标题链接 · {titleLinkLabel(message.titleUrl)}</span>
-                <ExternalLink className="size-3.5 shrink-0" />
-              </a>
+            {message.titleUrl && titleUrlLabel && (
+              <Button asChild variant="outline" size="sm" className="mt-0.5 max-w-40 shrink-0 px-2.5 text-blue-600 dark:text-blue-300">
+                <a
+                  href={message.titleUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`打开原标题链接：${titleUrlLabel}`}
+                >
+                  <span className="truncate">{titleUrlLabel}</span>
+                  <ExternalLink />
+                </a>
+              </Button>
             )}
-          </>
+          </div>
         ) : (
           <h2 className="text-balance text-lg font-extrabold leading-[1.4] tracking-[-0.01em] sm:text-xl">
             {richTitle ? (
