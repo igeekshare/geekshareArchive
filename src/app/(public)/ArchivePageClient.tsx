@@ -8,7 +8,6 @@ import SiteHeader from "@/components/SiteHeader";
 import MessageCard from "@/components/MessageCard";
 import ArchiveToolbar from "@/components/home/ArchiveToolbar";
 import DiscoverySpotlight from "@/components/home/DiscoverySpotlight";
-import HomepageHero from "@/components/home/HomepageHero";
 import { ChannelStrip, SidebarModules } from "@/components/home/HomepageSidebar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -204,8 +203,8 @@ export default function ArchivePageClient() {
       <SiteHeader searchValue={searchQuery} onSearchChange={setSearchQuery} onSearchSubmit={(value) => updateParams({ q: value.trim() })} branding={siteConfig.branding} telegramUrl={telegramUrl} />
 
       <main className="mx-auto max-w-[1276px] px-4 pb-20 pt-3 sm:pt-5 min-[1300px]:px-0">
+        <h1 className="sr-only">{siteConfig.branding.siteName}归档</h1>
         <div className="space-y-3 sm:space-y-4">
-          <HomepageHero stats={homepage?.stats ?? null} branding={siteConfig.branding} loading={homepageLoading} />
           <div id="channel"><ChannelStrip data={homepage} loading={homepageLoading} activeChannel={activeChannel} onChannelChange={(channelId) => updateParams({ channel: channelId })} /></div>
           {discoveryVisible && <DiscoverySpotlight data={homepage} loading={homepageLoading} onOpenMessage={rememberPosition} />}
         </div>

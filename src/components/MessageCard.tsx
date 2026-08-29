@@ -35,6 +35,17 @@ function formatFileSize(size?: number) {
   return `${(size / (1024 * 1024)).toFixed(size >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
 }
 
+function titleLinkLabel(value: string): string {
+  try {
+    const url = new URL(value);
+    if (url.protocol === "mailto:") return url.pathname;
+    if (url.protocol === "tg:") return "Telegram";
+    return url.hostname.replace(/^www\./i, "") || "原标题链接";
+  } catch {
+    return "原标题链接";
+  }
+}
+
 function MediaItem({ media, onOpenPhoto }: { media: PublicMedia; onOpenPhoto?: () => void }) {
   const url = mediaUrl(media.url);
   const thumb = mediaUrl(media.thumb);
@@ -245,11 +256,24 @@ export default function MessageCard({ message, mode = "feed", onScrollToReply, o
 
       <div className="mt-3 sm:mt-4">
         {detail ? (
-          <h1 className="text-balance text-2xl font-extrabold leading-[1.32] tracking-[-0.02em] sm:text-[2rem]">
-            {richTitle
-              ? <span className={richTitleClassName} dangerouslySetInnerHTML={{ __html: richTitle }} />
-              : message.title}
-          </h1>
+          <>
+            <h1 className="text-balance text-2xl font-extrabold leading-[1.32] tracking-[-0.02em] sm:text-[2rem]">
+              {richTitle
+                ? <span className={richTitleClassName} dangerouslySetInnerHTML={{ __html: richTitle }} />
+                : message.title}
+            </h1>
+            {message.titleUrl && (
+              <a
+                href={message.titleUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-md text-sm font-semibold text-blue-600 underline-offset-4 transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-blue-300"
+              >
+                <span className="truncate">打开原标题链接 · {titleLinkLabel(message.titleUrl)}</span>
+                <ExternalLink className="size-3.5 shrink-0" />
+              </a>
+            )}
+          </>
         ) : (
           <h2 className="text-balance text-lg font-extrabold leading-[1.4] tracking-[-0.01em] sm:text-xl">
             {richTitle ? (

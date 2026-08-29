@@ -24,6 +24,7 @@ function publicMessage(overrides: Partial<PublicMessage> = {}): PublicMessage {
     plainText: "完整正文\n下载页面",
     title: "🧠 Wake",
     titleHtml: "<strong>🧠 Wake</strong>",
+    titleUrl: "https://github.com/iAmCorey/Wake",
     summary: "这段摘要不应出现在帖子卡片中",
     tags: ["macos", "agent", "claude", "codex", "gemini", "local"],
     media: mediaItems[0],
@@ -46,6 +47,7 @@ test("feed cards render the rich body, every tag and every media item", () => {
   const html = renderToStaticMarkup(createElement(MessageCard, { message: publicMessage() }));
 
   assert.match(html, /href="\/message\/message1"[^>]*><strong>🧠 Wake<\/strong><\/a>/);
+  assert.doesNotMatch(html, /打开原标题链接/);
   assert.match(html, /message-reading-body--clamped/);
   assert.match(html, /<strong>完整正文<\/strong><br\/?><a href="https:\/\/example\.com\/download">下载页面<\/a>/);
   assert.doesNotMatch(html, /这段摘要不应出现在帖子卡片中/);
@@ -87,4 +89,15 @@ test("detail cards keep the same content order without clamping or summary dupli
   assert.doesNotMatch(html, /message-reading-body--clamped/);
   assert.doesNotMatch(html, /这段摘要不应出现在帖子卡片中/);
   assert.doesNotMatch(html, /<h1[^>]*>\s*<a/);
+  assert.match(html, /href="https:\/\/github\.com\/iAmCorey\/Wake"[^>]*target="_blank"[^>]*rel="noopener noreferrer"/);
+  assert.match(html, /打开原标题链接 · github\.com/);
+});
+
+test("detail cards omit the original-title action when no title link exists", () => {
+  const html = renderToStaticMarkup(createElement(MessageCard, {
+    message: publicMessage({ titleUrl: undefined }),
+    mode: "detail",
+  }));
+
+  assert.doesNotMatch(html, /打开原标题链接/);
 });
