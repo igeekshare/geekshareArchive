@@ -107,6 +107,18 @@ npm run deploy
 
 所有远程命令都会修改你的 Cloudflare 资源。执行前检查当前账号、配置文件和目标环境。
 
+### GitHub Actions 自动生产部署
+
+本仓库在推送到 `main` 后复用 CI 自动发布生产环境。Pull Request 只运行 lint、typecheck、测试、构建、Assets 校验、Wrangler dry-run 和依赖审计，不读取生产 Secret，也不会迁移或部署远程资源。
+
+在 GitHub 仓库的 Actions Secrets 中配置：
+
+- `CLOUDFLARE_API_TOKEN`：限制到目标 Cloudflare 账号和域名的专用 CI Token，需要 Workers 编辑与 D1 Edit 权限。
+- `CLOUDFLARE_ACCOUNT_ID`：目标 Cloudflare 账号 ID。
+- `WRANGLER_CONFIG_JSON`：本地生产 `wrangler.jsonc` 的完整内容；不要包含 Worker 运行时 Secret。
+
+`main` 的检查全部通过后，流水线会校验上述 Secret、恢复临时 `wrangler.jsonc`、应用待执行的 D1 migration、部署 Worker，并验证 `https://archive.geekshare.org/` 与公开归档 API。任一 Secret 缺失或任一步失败都会在部署前后相应位置终止流水线，不会把配置文件提交到 Git。
+
 ### Cloudflare Access
 
 生产管理 API 会验证 Access JWT 的签名、issuer、audience 和管理员邮箱，并对写请求执行 `SITE_URL` 同源校验。
