@@ -6,7 +6,55 @@ import {
   deliver,
   messageUpdate,
   reactionUpdate,
+  telegramFetch,
 } from "./cloudflare-test-helpers";
+import type { TelegramUpdate } from "../src/cloudflare/telegram";
+
+function richMessageUpdate(updateId: number, title: string, edited = false): TelegramUpdate {
+  const message = {
+    message_id: 77,
+    date: 1_700_000_000,
+    ...(edited ? { edit_date: 1_700_000_100 } : {}),
+    chat: { id: -1001, title: "Channel", username: "xgeekshare", type: "channel" },
+    rich_message: {
+      blocks: [
+        { type: "heading", size: 1, text: { type: "bold", text: title } },
+        { type: "paragraph", text: "富文本正文 #Rich" },
+        {
+          type: "list",
+          items: [{ label: "•", blocks: [{ type: "paragraph", text: "列表正文" }] }],
+        },
+        {
+          type: "table",
+          cells: [[{ text: "项目", is_header: true }, { text: "状态", is_header: true }], [{ text: "归档" }, { text: "正常" }]],
+        },
+        {
+          type: "details",
+          summary: "更多信息",
+          blocks: [{ type: "paragraph", text: "折叠正文" }, { type: "paragraph", text: "第二段" }],
+        },
+        {
+          type: "collage",
+          blocks: [
+            {
+              type: "photo",
+              photo: [{ file_id: "rich-photo", file_unique_id: "rich-photo-unique", file_size: 100 }],
+              caption: { text: "图片说明" },
+            },
+            {
+              type: "document",
+              document: { file_id: "rich-document", file_unique_id: "rich-document-unique", file_size: 100, file_name: "guide.pdf", mime_type: "application/pdf" },
+              caption: { text: "文件说明" },
+            },
+          ],
+        },
+      ],
+    },
+  };
+  return edited
+    ? { update_id: updateId, edited_channel_post: message }
+    : { update_id: updateId, channel_post: message };
+}
 
 test("webhook claims first delivery, skips terminal and fresh duplicates, and retries failed updates", async () => {
   const { db, env } = createTestEnv();
@@ -44,6 +92,54 @@ test("webhook claims first delivery, skips terminal and fresh duplicates, and re
     { status: "success", error: null, attempt_count: 2 },
   );
   assert.equal(db.scalar("SELECT COUNT(*) AS value FROM messages WHERE telegram_message_id = 9"), 1);
+});
+
+test("rich channel posts persist searchable content and media while edits respect admin overrides", async (context) => {
+  const { db, env } = createTestEnv();
+  const telegram = telegramFetch();
+  context.mock.method(globalThis, "fetch", telegram.handler);
+
+  assert.equal((await deliver(env, richMessageUpdate(60, "富文本标题"))).response.status, 204);
+  const row = db.row<{ html: string; plain_text: string; media: string; media_archive_status: string }>(
+    "SELECT html, plain_text, media, media_archive_status FROM messages WHERE id = 'message77'",
+  );
+  assert.match(row.html, /tg-rich-heading-1/);
+  assert.match(row.plain_text, /^富文本标题\n富文本正文 #Rich/);
+  assert.equal(row.media_archive_status, "archived");
+  assert.deepEqual(
+    (JSON.parse(row.media) as Array<{ type: string; archiveStatus: string }>).map(({ type, archiveStatus }) => ({ type, archiveStatus })),
+    [{ type: "photo", archiveStatus: "archived" }, { type: "file", archiveStatus: "archived" }],
+  );
+  assert.deepEqual(
+    db.sqlite.prepare("SELECT tag FROM message_tags WHERE message_id = 'message77'").all().map((item) => ({ ...item })),
+    [{ tag: "rich" }],
+  );
+  assert.equal(db.scalar("SELECT COUNT(*) AS value FROM messages_fts WHERE messages_fts MATCH '\"富文本正文\"'"), 1);
+
+  const publicResponse = await handleApi(new Request("https://archive.example.com/api/messages/message77"), env);
+  const publicMessage = await publicResponse.json() as { title: string; text: string; plainText: string; mediaItems: unknown[] };
+  assert.equal(publicMessage.title, "富文本标题");
+  assert.match(publicMessage.plainText, /富文本正文 #Rich/);
+  assert.match(publicMessage.text, /<ul class="tg-rich-list">/);
+  assert.match(publicMessage.text, /tg-rich-table-scroll/);
+  assert.match(publicMessage.text, /<details>/);
+  assert.match(publicMessage.text, /tg-rich-block-break/);
+  assert.equal(publicMessage.mediaItems.length, 2);
+
+  const patch = await handleApi(
+    new Request("https://archive.example.com/api/admin/messages/message77", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Origin: "https://archive.example.com" },
+      body: JSON.stringify({ plainText: "管理正文" }),
+    }),
+    env,
+  );
+  assert.equal(patch.status, 200);
+  assert.equal((await deliver(env, richMessageUpdate(61, "Telegram 编辑标题", true))).response.status, 204);
+  assert.deepEqual(
+    db.row("SELECT html, plain_text, admin_override FROM messages WHERE id = 'message77'"),
+    { html: "管理正文", plain_text: "管理正文", admin_override: 1 },
+  );
 });
 
 test("stale processing is reclaimed with a conditional claim and only one concurrent replay wins", async () => {

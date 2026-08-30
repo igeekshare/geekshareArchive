@@ -7,6 +7,7 @@ import {
   messageMedia,
   shanghaiDate,
   stableMessageId,
+  telegramMessageContent,
   telegramTextToHtml,
 } from "../src/cloudflare/telegram";
 import type { Env } from "../src/cloudflare/runtime";
@@ -27,6 +28,87 @@ test("Telegram entities become a small safe HTML subset", () => {
     ]),
     "click",
   );
+});
+
+test("Telegram rich messages become safe searchable HTML, text, and ordered media", () => {
+  const content = telegramMessageContent({
+    message_id: 8,
+    date: 0,
+    chat: { id: -1001 },
+    rich_message: {
+      blocks: [
+        {
+          type: "heading",
+          size: 1,
+          text: { type: "bold", text: ["<富文本标题>", { type: "url", text: " 官网", url: "https://example.com/docs?a=1&b=2" }] },
+        },
+        {
+          type: "paragraph",
+          text: ["正文 #Rich", { type: "url", text: " 不安全链接", url: "javascript:alert(1)" }],
+        },
+        {
+          type: "list",
+          items: [
+            { label: "•", blocks: [{ type: "paragraph", text: "第一项" }] },
+            { has_checkbox: true, is_checked: true, blocks: [{ type: "paragraph", text: { type: "code", text: "done()" } }] },
+          ],
+        },
+        {
+          type: "blockquote",
+          blocks: [{ type: "paragraph", text: { type: "italic", text: "引用" } }],
+          credit: "作者",
+        },
+        { type: "pre", language: "ts\" onclick=\"x", text: "const value = 1;\nvalue++;" },
+        {
+          type: "table",
+          is_bordered: true,
+          caption: "数据表",
+          cells: [[
+            { text: "名称", is_header: true },
+            { text: "数值", is_header: true, align: "right" },
+          ], [{ text: "A" }, { text: "1", align: "right" }]],
+        },
+        {
+          type: "details",
+          summary: "更多",
+          is_open: true,
+          blocks: [{ type: "paragraph", text: "折叠正文" }],
+        },
+        { type: "mathematical_expression", expression: "E = mc^2" },
+        {
+          type: "collage",
+          blocks: [
+            {
+              type: "photo",
+              photo: [{ file_id: "small", file_unique_id: "p1", file_size: 10 }, { file_id: "large", file_unique_id: "p2", file_size: 20 }],
+              caption: { text: "图片说明", credit: "摄影者" },
+            },
+            {
+              type: "document",
+              document: { file_id: "document", file_unique_id: "d1", file_name: "guide.pdf", mime_type: "application/pdf" },
+              caption: { text: "文件说明" },
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  assert.match(content.html, /tg-rich-heading-1/);
+  assert.match(content.html, /&lt;富文本标题&gt;/);
+  assert.match(content.html, /href="https:\/\/example\.com\/docs\?a=1&amp;b=2"/);
+  assert.doesNotMatch(content.html, /javascript:|onclick="x"/);
+  assert.match(content.html, /<ul class="tg-rich-list">/);
+  assert.match(content.html, /<blockquote>/);
+  assert.match(content.html, /<pre><code data-language="ts&quot; onclick=&quot;x">/);
+  assert.match(content.html, /tg-rich-table-scroll/);
+  assert.match(content.html, /<details open>/);
+  assert.match(content.html, /E = mc\^2/);
+  assert.match(content.plainText, /<富文本标题> 官网[\s\S]*正文 #Rich[\s\S]*第一项[\s\S]*数据表[\s\S]*折叠正文/);
+  assert.deepEqual(content.media.map((item) => ({ type: item.type, fileId: item.fileId, title: item.title, description: item.description })), [
+    { type: "photo", fileId: "large", title: undefined, description: "图片说明 — 摄影者" },
+    { type: "file", fileId: "document", title: "guide.pdf", description: "文件说明" },
+  ]);
 });
 
 test("date and stable IDs preserve existing links", () => {

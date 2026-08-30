@@ -60,12 +60,11 @@ import {
   archiveBotFile,
   extractTags,
   MediaArchiveError,
-  messageMedia,
   secretsMatch,
   shanghaiDate,
   stableMessageId,
   telegramApi,
-  telegramTextToHtml,
+  telegramMessageContent,
   type TelegramMessage,
   type TelegramReactionUpdate,
   type TelegramUpdate,
@@ -604,10 +603,9 @@ async function persistMessage(
     .bind(channel.id, message.message_id)
     .first<{ id: string; admin_override: number }>();
   const id = existing?.id ?? stableMessageId(channel.id, message.message_id);
-  const text = message.text ?? message.caption ?? "";
-  const entities = message.entities ?? message.caption_entities ?? [];
+  const content = telegramMessageContent(message);
   const time = shanghaiDate(message.date);
-  const media = messageMedia(message);
+  const media = content.media;
   const archiveStatus = media.length ? "pending" : "none";
   const replyTarget = message.reply_to_message
     ? await env.DB.prepare(
@@ -621,7 +619,7 @@ async function persistMessage(
     ? replyTarget?.id ?? stableMessageId(channel.id, message.reply_to_message.message_id)
     : null;
   const sourceUrl = `https://t.me/${channel.username}/${message.message_id}`;
-  const tags = extractTags(text);
+  const tags = extractTags(content.plainText);
   const statements = [
     env.DB.prepare(
       `INSERT INTO messages (
@@ -663,8 +661,8 @@ async function persistMessage(
       time.year,
       time.month,
       message.sender_chat?.title ?? message.chat.title ?? channel.title,
-      telegramTextToHtml(text, entities),
-      text,
+      content.html,
+      content.plainText,
       JSON.stringify(media),
       replyTo,
       JSON.stringify(update),
@@ -1403,7 +1401,7 @@ async function prepareMessageMediaRetry(
   const update = safeJsonParse<TelegramUpdate | null>(row.raw_payload, null);
   const message = update?.channel_post ?? update?.edited_channel_post;
   const storedMedia = safeJsonParse<StoredMedia[]>(row.media, []);
-  const media = storedMedia.length ? storedMedia : message ? messageMedia(message) : [];
+  const media = storedMedia.length ? storedMedia : message ? telegramMessageContent(message).media : [];
   if (!media.length) {
     return { ok: false, status: 409, error: "Message has no retryable Telegram media" };
   }

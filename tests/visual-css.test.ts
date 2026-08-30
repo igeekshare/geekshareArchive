@@ -23,4 +23,6 @@ test("technical message content cannot widen narrow cards", () => {
   assert.match(css, /\.message-reading-body pre\s*{[\s\S]*?max-width:\s*100%/);
   assert.match(css, /\.message-reading-body pre\s*{[\s\S]*?overflow-x:\s*auto/);
   assert.match(css, /\.message-reading-body pre code\s*{[\s\S]*?white-space:\s*pre/);
+  assert.match(css, /\.message-reading-body \.tg-rich-table-scroll\s*{[\s\S]*?max-width:\s*100%[\s\S]*?overflow-x:\s*auto/);
+  assert.match(css, /\.message-reading-body \.tg-rich-math--block\s*{[\s\S]*?overflow-x:\s*auto/);
 });

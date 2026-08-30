@@ -308,6 +308,194 @@ textarea {
     white-space: pre;
   }
 
+  .message-reading-body .tg-rich-heading {
+    color: hsl(var(--foreground));
+    font-weight: 750;
+  }
+
+  .message-reading-body .tg-rich-heading-1 {
+    font-size: 1.25em;
+  }
+
+  .message-reading-body .tg-rich-heading-2,
+  .message-reading-body .tg-rich-heading-3 {
+    font-size: 1.125em;
+  }
+
+  .message-reading-body .tg-rich-list {
+    margin-block: 0.75rem;
+    padding-left: 1.5rem;
+  }
+
+  .message-reading-body ul.tg-rich-list {
+    list-style: disc;
+  }
+
+  .message-reading-body ol.tg-rich-list {
+    list-style: decimal;
+  }
+
+  .message-reading-body .tg-rich-list li + li {
+    margin-top: 0.25rem;
+  }
+
+  .message-reading-body .tg-rich-block-break {
+    display: block;
+    height: 0.45rem;
+  }
+
+  .message-reading-body .tg-rich-checkbox {
+    display: inline-block;
+    margin-right: 0.45rem;
+  }
+
+  .message-reading-body blockquote {
+    margin-block: 0.875rem;
+    border-left: 3px solid hsl(var(--primary));
+    border-radius: 0 0.5rem 0.5rem 0;
+    background: hsl(var(--muted) / 0.55);
+    padding: 0.6rem 0.875rem;
+  }
+
+  .message-reading-body blockquote footer,
+  .message-reading-body .tg-rich-footer,
+  .message-reading-body .tg-rich-caption {
+    color: hsl(var(--muted-foreground));
+    font-size: 0.875em;
+  }
+
+  .message-reading-body .tg-rich-pullquote {
+    border-inline: 0;
+    border-block: 1px solid hsl(var(--border));
+    border-radius: 0;
+    background: transparent;
+    text-align: center;
+  }
+
+  .message-reading-body .tg-rich-divider {
+    margin-block: 1rem;
+    border: 0;
+    border-top: 1px solid hsl(var(--border));
+  }
+
+  .message-reading-body mark {
+    border-radius: 0.2em;
+    background: hsl(48 96% 70% / 0.65);
+    padding-inline: 0.12em;
+    color: inherit;
+  }
+
+  .message-reading-body details {
+    margin-block: 0.875rem;
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.65rem;
+    background: hsl(var(--muted) / 0.35);
+    padding: 0.65rem 0.8rem;
+  }
+
+  .message-reading-body summary {
+    cursor: pointer;
+    color: hsl(var(--foreground));
+    font-weight: 650;
+  }
+
+  .message-reading-body details[open] > summary {
+    margin-bottom: 0.5rem;
+  }
+
+  .message-reading-body .tg-rich-math--block {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    margin-block: 0.875rem;
+    white-space: pre;
+  }
+
+  .message-reading-body .tg-rich-table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+    margin-block: 1rem;
+  }
+
+  .message-reading-body .tg-rich-table {
+    width: 100%;
+    min-width: max-content;
+    border-collapse: collapse;
+    font-size: 0.9em;
+    line-height: 1.55;
+  }
+
+  .message-reading-body .tg-rich-table caption {
+    margin-bottom: 0.5rem;
+    color: hsl(var(--muted-foreground));
+    text-align: left;
+  }
+
+  .message-reading-body .tg-rich-table th,
+  .message-reading-body .tg-rich-table td {
+    border-bottom: 1px solid hsl(var(--border));
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+  }
+
+  .message-reading-body .tg-rich-table th {
+    background: hsl(var(--muted) / 0.6);
+    color: hsl(var(--foreground));
+    font-weight: 700;
+  }
+
+  .message-reading-body .tg-rich-table.is-bordered th,
+  .message-reading-body .tg-rich-table.is-bordered td {
+    border: 1px solid hsl(var(--border));
+  }
+
+  .message-reading-body .tg-rich-table.is-striped tr:nth-child(even) td {
+    background: hsl(var(--muted) / 0.35);
+  }
+
+  .message-reading-body .tg-rich-table.is-compact th,
+  .message-reading-body .tg-rich-table.is-compact td {
+    padding: 0.3rem 0.5rem;
+  }
+
+  .message-reading-body .tg-align-center {
+    text-align: center !important;
+  }
+
+  .message-reading-body .tg-align-right {
+    text-align: right !important;
+  }
+
+  .message-reading-body .tg-valign-middle {
+    vertical-align: middle;
+  }
+
+  .message-reading-body .tg-valign-top {
+    vertical-align: top;
+  }
+
+  .message-reading-body .tg-valign-bottom {
+    vertical-align: bottom;
+  }
+
+  .message-reading-body .tg-rich-button-row {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .message-reading-body .tg-rich-button {
+    display: inline-flex;
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.5rem;
+    padding: 0.2rem 0.65rem;
+    text-decoration: none;
+  }
+
+  .message-reading-body .tg-rich-button--inactive {
+    color: hsl(var(--muted-foreground));
+  }
+
   .message-reading-body img,
   .message-reading-body video {
     max-width: 100%;
