@@ -63,7 +63,7 @@
     "yet-another-react-lightbox": "^3.32.2"
   },
   "devDependencies": {
-    "@prisma/client": "^5.22.0",
+    "@prisma/client": "^7.10.0",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
