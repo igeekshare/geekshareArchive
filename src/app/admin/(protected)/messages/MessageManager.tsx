@@ -44,6 +44,11 @@ type AdminMessage = PublicMessage & {
   adminUpdatedAt: string | null;
   adminUpdatedBy: string | null;
   updatedAt: string;
+  displayBlockReasons: Array<{
+    id: number;
+    type: "tag" | "keyword";
+    value: string;
+  }>;
 };
 
 type MessageResponse = {
@@ -116,6 +121,10 @@ function statusChoiceClass(active: boolean, tone: "published" | "hidden"): strin
   return tone === "published"
     ? "border-emerald-300 bg-emerald-50 text-emerald-900"
     : "border-amber-300 bg-amber-50 text-amber-900";
+}
+
+function displayBlockReasonLabel(reason: AdminMessage["displayBlockReasons"][number]): string {
+  return reason.type === "tag" ? `#${reason.value}` : `“${reason.value}”`;
 }
 
 function readInitialFilters(): { filters: Filters; page: number } {
@@ -434,6 +443,14 @@ export default function MessageManager() {
                 <td className="px-3 py-4">
                   <div className="flex flex-col items-start gap-2">
                     <span className={`rounded-full px-2 py-1 text-xs font-medium ${message.status === "published" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{message.status === "published" ? "公开" : "隐藏"}</span>
+                    {message.displayBlockReasons.length > 0 && (
+                      <span
+                        className="max-w-full break-all rounded-md bg-red-50 px-2 py-1 text-xs font-medium leading-5 text-red-700"
+                        title={`命中展示规则：${message.displayBlockReasons.map(displayBlockReasonLabel).join("、")}`}
+                      >
+                        展示已屏蔽 · {message.displayBlockReasons.map(displayBlockReasonLabel).join("、")}
+                      </span>
+                    )}
                     <span className={`rounded-full px-2 py-1 text-xs font-medium ${archiveTone(message.archiveStatus)}`}>{archiveLabel(message.archiveStatus)}</span>
                     {message.adminOverride && <span className="text-[11px] text-zinc-400">后台覆盖</span>}
                   </div>
@@ -467,6 +484,11 @@ export default function MessageManager() {
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-zinc-100 pt-3">
               <span className={`rounded-full px-2 py-1 text-xs font-medium ${message.status === "published" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{message.status === "published" ? "公开" : "隐藏"}</span>
+              {message.displayBlockReasons.length > 0 && (
+                <span className="max-w-full break-all rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700">
+                  展示已屏蔽 · {message.displayBlockReasons.map(displayBlockReasonLabel).join("、")}
+                </span>
+              )}
               <span className={`rounded-full px-2 py-1 text-xs font-medium ${archiveTone(message.archiveStatus)}`}>{archiveLabel(message.archiveStatus)}</span>
               <div className="ml-auto flex gap-1">
                 <Button variant="ghost" size="icon" title="编辑消息" disabled={busy !== null} onClick={() => setEditing(message)}><Pencil /></Button>

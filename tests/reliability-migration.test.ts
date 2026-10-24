@@ -14,7 +14,7 @@ function columns(db: LocalD1, table: string): string[] {
   return (db.sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map(({ name }) => name);
 }
 
-test("fresh schema applies webhook lease, media retry, and bounded reaction migrations", () => {
+test("fresh schema applies reliability and display-rule migrations", () => {
   const db = new LocalD1();
   assert.deepEqual(
     columns(db, "webhook_updates").filter((name) => ["attempt_count", "last_attempt_at"].includes(name)),
@@ -36,6 +36,17 @@ test("fresh schema applies webhook lease, media retry, and bounded reaction migr
   assert.ok(
     (db.sqlite.prepare("PRAGMA index_list(messages)").all() as Array<{ name: string }>)
       .some(({ name }) => name === "messages_media_retry_queue_idx"),
+  );
+  assert.deepEqual(
+    columns(db, "display_block_rules").filter((name) => [
+      "id",
+      "type",
+      "value",
+      "normalized_value",
+      "created_by",
+      "created_at",
+    ].includes(name)),
+    ["id", "type", "value", "normalized_value", "created_by", "created_at"],
   );
 });
 
@@ -151,7 +162,7 @@ test("0005 upgrades an existing 0001-0004 database without losing messages, FTS,
   );
 });
 
-test("Wrangler recognizes 0005 and 0006 for fresh apply and existing local D1 upgrade", () => {
+test("Wrangler recognizes 0005 through 0007 for fresh apply and existing local D1 upgrade", () => {
   const temporary = mkdtempSync(path.join(tmpdir(), "geekshare-reliability-migration-"));
   const migrations = path.join(temporary, "migrations");
   const xdgConfig = path.join(temporary, "xdg");
@@ -213,6 +224,7 @@ test("Wrangler recognizes 0005 and 0006 for fresh apply and existing local D1 up
     const upgraded = run(["d1", "migrations", "apply", "geekshare-archive"], upgradePersistence);
     assert.match(upgraded, /0005_webhook_media_reliability\.sql/);
     assert.match(upgraded, /0006_bound_missing_reaction_retries\.sql/);
+    assert.match(upgraded, /0007_display_block_rules\.sql/);
     const upgradeQuery = JSON.parse(run([
       "d1", "execute", "geekshare-archive", "--command",
       `SELECT COUNT(*) AS messages FROM messages;
@@ -237,17 +249,20 @@ test("Wrangler recognizes 0005 and 0006 for fresh apply and existing local D1 up
     assert.match(fresh, /0001_initial\.sql/);
     assert.match(fresh, /0005_webhook_media_reliability\.sql/);
     assert.match(fresh, /0006_bound_missing_reaction_retries\.sql/);
+    assert.match(fresh, /0007_display_block_rules\.sql/);
     const freshQuery = JSON.parse(run([
       "d1", "execute", "geekshare-archive", "--command",
       `SELECT COUNT(*) AS webhook_columns FROM pragma_table_info('webhook_updates')
        WHERE name IN ('attempt_count', 'last_attempt_at');
        SELECT COUNT(*) AS media_columns FROM pragma_table_info('messages')
-       WHERE name IN ('media_retry_count', 'media_last_error', 'media_next_retry_at', 'media_retry_exhausted');`,
+       WHERE name IN ('media_retry_count', 'media_last_error', 'media_next_retry_at', 'media_retry_exhausted');
+       SELECT COUNT(*) AS display_rule_columns FROM pragma_table_info('display_block_rules');`,
       "--json",
     ], freshPersistence)) as Array<{ results: Array<Record<string, number>> }>;
     assert.deepEqual(freshQuery.map(({ results }) => results[0]), [
       { webhook_columns: 2 },
       { media_columns: 4 },
+      { display_rule_columns: 6 },
     ]);
   } finally {
     rmSync(temporary, { recursive: true, force: true });

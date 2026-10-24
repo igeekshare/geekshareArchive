@@ -21,6 +21,7 @@ export const ALL_MIGRATIONS = [
   "0004_rebuild_messages_fts.sql",
   "0005_webhook_media_reliability.sql",
   "0006_bound_missing_reaction_retries.sql",
+  "0007_display_block_rules.sql",
 ] as const;
 
 type FailureRule = {

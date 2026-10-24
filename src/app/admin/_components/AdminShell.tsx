@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   FileText,
   Globe2,
+  EyeOff,
   LayoutDashboard,
   LogOut,
   RadioTower,
@@ -16,6 +17,7 @@ const navigation = [
   { href: "/admin/dashboard", label: "概览", icon: LayoutDashboard },
   { href: "/admin/channels", label: "频道管理", icon: RadioTower },
   { href: "/admin/messages", label: "内容管理", icon: FileText },
+  { href: "/admin/display", label: "展示管理", icon: EyeOff },
   { href: "/admin/sync", label: "Telegram 同步", icon: SearchCheck },
   { href: "/admin/seo", label: "SEO 设置", icon: Globe2 },
   { href: "/admin/site", label: "站点设置", icon: Settings },
@@ -57,6 +59,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
               <Link
                 key={href}
                 href={href}
+                aria-current={isActive ? "page" : undefined}
                 className={`flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors ${
                   isActive
                     ? "bg-zinc-900 text-white"
@@ -93,6 +96,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
               <Link
                 key={href}
                 href={href}
+                aria-current={isActive ? "page" : undefined}
                 className={`shrink-0 rounded-md px-3 py-2 text-sm font-medium ${
                   isActive
                     ? "bg-zinc-900 text-white"

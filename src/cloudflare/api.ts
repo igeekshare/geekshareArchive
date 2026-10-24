@@ -36,6 +36,12 @@ import {
   parseMessageSort,
   type MessageCursor,
 } from "./public-query";
+import {
+  displayRuleMatchesMessage,
+  normalizeDisplayBlockRule,
+  publicMessageVisibilityClause,
+  type DisplayBlockRuleType,
+} from "./display-rules";
 import type { HomepageData, MessageDiscoveryContext, MessageSort } from "../lib/messages";
 import {
   DEFAULT_BRANDING_SETTINGS,
@@ -128,6 +134,16 @@ interface AdminMessageRow extends MessageRow {
   tags: string;
   origin_channel_title: string;
   origin_channel_username: string;
+  display_block_reasons: string;
+}
+
+interface DisplayBlockRuleRow {
+  id: number;
+  type: DisplayBlockRuleType;
+  value: string;
+  created_by: string | null;
+  created_at: string;
+  match_count: number;
 }
 
 interface TombstoneRow {
@@ -242,10 +258,25 @@ const ADMIN_MESSAGE_SELECT = `
          m.updated_at,
          oc.title AS origin_channel_title, oc.username AS origin_channel_username,
          COALESCE((SELECT json_group_array(mt.tag)
-                   FROM message_tags mt WHERE mt.message_id = m.id), '[]') AS tags
+                   FROM message_tags mt WHERE mt.message_id = m.id), '[]') AS tags,
+         COALESCE((SELECT json_group_array(json_object(
+                    'id', display_rule.id,
+                    'type', display_rule.type,
+                    'value', display_rule.value
+                  ))
+                   FROM display_block_rules display_rule
+                   WHERE ${displayRuleMatchesMessage("display_rule", "m")}), '[]') AS display_block_reasons
   FROM messages m
   JOIN channels c ON c.id = m.channel_id
   JOIN channels oc ON oc.id = COALESCE(m.origin_channel_id, m.channel_id)`;
+
+const DISPLAY_BLOCK_RULE_SELECT = `
+  SELECT display_rule.id, display_rule.type, display_rule.value,
+         display_rule.created_by, display_rule.created_at,
+         (SELECT COUNT(*) FROM messages m
+          WHERE m.status = 'published'
+            AND ${displayRuleMatchesMessage("display_rule", "m")}) AS match_count
+  FROM display_block_rules display_rule`;
 
 function adminMessageJson(row: AdminMessageRow, env: Env): Record<string, unknown> {
   return {
@@ -263,6 +294,22 @@ function adminMessageJson(row: AdminMessageRow, env: Env): Record<string, unknow
     adminUpdatedAt: row.admin_updated_at,
     adminUpdatedBy: row.admin_updated_by,
     updatedAt: row.updated_at,
+    displayBlockReasons: safeJsonParse<Array<{
+      id: number;
+      type: DisplayBlockRuleType;
+      value: string;
+    }>>(row.display_block_reasons, []),
+  };
+}
+
+function displayBlockRuleJson(row: DisplayBlockRuleRow): Record<string, unknown> {
+  return {
+    id: Number(row.id),
+    type: row.type,
+    value: row.value,
+    matchCount: Number(row.match_count ?? 0),
+    createdBy: row.created_by,
+    createdAt: row.created_at,
   };
 }
 
@@ -346,7 +393,7 @@ async function getMessages(request: Request, env: Env): Promise<Response> {
   }
 
   const values: unknown[] = [];
-  let where = " WHERE m.status = 'published'";
+  let where = ` WHERE ${publicMessageVisibilityClause("m")}`;
   if (requestedIds.length) {
     where += ` AND m.id IN (${requestedIds.map(() => "?").join(", ")})`;
     values.push(...requestedIds);
@@ -408,7 +455,7 @@ async function getHomepage(env: Env): Promise<Response> {
   const channelRows = await env.DB.prepare(
     `SELECT c.*, COUNT(m.id) AS message_count
      FROM channels c
-     LEFT JOIN messages m ON m.channel_id = c.id AND m.status = 'published'
+     LEFT JOIN messages m ON m.channel_id = c.id AND ${publicMessageVisibilityClause("m")}
      GROUP BY c.id
      HAVING c.enabled = 1 OR COUNT(m.id) > 0
      ORDER BY c.created_at ASC`,
@@ -416,34 +463,34 @@ async function getHomepage(env: Env): Promise<Response> {
   const channels = channelRows.results ?? [];
   const [messageCount, tagCount, hotTopics, featured, trending, fallbackFeatured, recentMedia] = await Promise.all([
     env.DB.prepare(
-      "SELECT COUNT(*) AS count FROM messages WHERE status = 'published'",
+      `SELECT COUNT(*) AS count FROM messages m WHERE ${publicMessageVisibilityClause("m")}`,
     ).first<{ count: number }>(),
     env.DB.prepare(
       `SELECT COUNT(DISTINCT mt.tag) AS count
        FROM message_tags mt JOIN messages m ON m.id = mt.message_id
-       WHERE m.status = 'published'`,
+       WHERE ${publicMessageVisibilityClause("m")}`,
     ).first<{ count: number }>(),
     env.DB.prepare(
       `SELECT mt.tag, COUNT(*) AS count
        FROM message_tags mt JOIN messages m ON m.id = mt.message_id
-       WHERE m.status = 'published'
+       WHERE ${publicMessageVisibilityClause("m")}
        GROUP BY mt.tag ORDER BY count DESC, mt.tag ASC LIMIT 8`,
     ).all<{ tag: string; count: number }>(),
     env.DB.prepare(
-      `${MESSAGE_SELECT} WHERE m.status = 'published' AND m.is_featured = 1
+      `${MESSAGE_SELECT} WHERE ${publicMessageVisibilityClause("m")} AND m.is_featured = 1
        ORDER BY m.featured_order ASC, m.published_at DESC, m.id DESC LIMIT 3`,
     ).all<MessageRow>(),
     env.DB.prepare(
-      `${MESSAGE_SELECT} WHERE m.status = 'published' AND m.is_featured = 0
+      `${MESSAGE_SELECT} WHERE ${publicMessageVisibilityClause("m")} AND m.is_featured = 0
        AND m.published_at >= CAST(strftime('%s', 'now', '-7 days') AS INTEGER)
        ORDER BY m.engagement_score DESC, m.published_at DESC, m.id DESC LIMIT 4`,
     ).all<MessageRow>(),
     env.DB.prepare(
-      `${MESSAGE_SELECT} WHERE m.status = 'published'
+      `${MESSAGE_SELECT} WHERE ${publicMessageVisibilityClause("m")}
        ORDER BY m.engagement_score DESC, m.published_at DESC, m.id DESC LIMIT 1`,
     ).first<MessageRow>(),
     env.DB.prepare(
-      `${MESSAGE_SELECT} WHERE m.status = 'published'
+      `${MESSAGE_SELECT} WHERE ${publicMessageVisibilityClause("m")}
        AND json_array_length(m.media) > 0
        ORDER BY m.published_at DESC, m.id DESC LIMIT 5`,
     ).all<MessageRow>(),
@@ -484,13 +531,13 @@ async function getArchiveMeta(env: Env): Promise<Response> {
     env.DB.prepare(
       `SELECT tag, COUNT(*) AS count
        FROM message_tags mt JOIN messages m ON m.id = mt.message_id
-       WHERE m.status = 'published'
+       WHERE ${publicMessageVisibilityClause("m")}
        GROUP BY tag HAVING COUNT(*) >= 2
        ORDER BY count DESC, tag ASC`,
     ).all<{ tag: string; count: number }>(),
     env.DB.prepare(
       `SELECT published_year AS year, published_month AS month, COUNT(*) AS count
-       FROM messages WHERE status = 'published'
+       FROM messages m WHERE ${publicMessageVisibilityClause("m")}
        GROUP BY published_year, published_month
        ORDER BY published_year DESC, published_month DESC`,
     ).all<{ year: string; month: string; count: number }>(),
@@ -510,7 +557,7 @@ async function getArchiveMeta(env: Env): Promise<Response> {
 }
 
 export async function findMessage(id: string, env: Env): Promise<ReturnType<typeof messageRowToPublic> | null> {
-  const row = await env.DB.prepare(`${MESSAGE_SELECT} WHERE m.id = ? AND m.status = 'published'`)
+  const row = await env.DB.prepare(`${MESSAGE_SELECT} WHERE m.id = ? AND ${publicMessageVisibilityClause("m")}`)
     .bind(id)
     .first<MessageRow>();
   return row ? messageRowToPublic(row, env.MEDIA_BASE_URL) : null;
@@ -523,7 +570,7 @@ async function getMessage(id: string, env: Env): Promise<Response> {
 
 async function getMessageDiscoveryContext(id: string, env: Env): Promise<Response> {
   const target = await env.DB.prepare(
-    `${MESSAGE_SELECT} WHERE m.id = ? AND m.status = 'published'`,
+    `${MESSAGE_SELECT} WHERE m.id = ? AND ${publicMessageVisibilityClause("m")}`,
   )
     .bind(id)
     .first<MessageRow>();
@@ -531,17 +578,17 @@ async function getMessageDiscoveryContext(id: string, env: Env): Promise<Respons
 
   const [previous, next, related] = await Promise.all([
     env.DB.prepare(
-      `${MESSAGE_SELECT} WHERE m.status = 'published' AND
+      `${MESSAGE_SELECT} WHERE ${publicMessageVisibilityClause("m")} AND
        (m.published_at < ? OR (m.published_at = ? AND m.id < ?))
        ORDER BY m.published_at DESC, m.id DESC LIMIT 1`,
     ).bind(target.published_at, target.published_at, target.id).first<MessageRow>(),
     env.DB.prepare(
-      `${MESSAGE_SELECT} WHERE m.status = 'published' AND
+      `${MESSAGE_SELECT} WHERE ${publicMessageVisibilityClause("m")} AND
        (m.published_at > ? OR (m.published_at = ? AND m.id > ?))
        ORDER BY m.published_at ASC, m.id ASC LIMIT 1`,
     ).bind(target.published_at, target.published_at, target.id).first<MessageRow>(),
     env.DB.prepare(
-      `${MESSAGE_SELECT} WHERE m.status = 'published' AND m.id <> ? AND (
+      `${MESSAGE_SELECT} WHERE ${publicMessageVisibilityClause("m")} AND m.id <> ? AND (
          m.channel_id = ? OR EXISTS (
            SELECT 1 FROM message_tags candidate_tag
            WHERE candidate_tag.message_id = m.id AND candidate_tag.tag IN (
@@ -1533,6 +1580,70 @@ async function adminDashboard(request: Request, env: Env): Promise<Response> {
   });
 }
 
+async function adminDisplayRules(
+  request: Request,
+  env: Env,
+  adminEmail: string,
+): Promise<Response> {
+  if (request.method === "GET") {
+    const rows = await env.DB.prepare(
+      `${DISPLAY_BLOCK_RULE_SELECT}
+       ORDER BY display_rule.type ASC, display_rule.created_at DESC, display_rule.id DESC`,
+    ).all<DisplayBlockRuleRow>();
+    return json((rows.results ?? []).map(displayBlockRuleJson));
+  }
+  if (request.method !== "POST") return errorResponse(405, "Method not allowed");
+
+  let body: { type?: unknown; value?: unknown };
+  try {
+    const parsed = await request.json();
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid");
+    body = parsed as { type?: unknown; value?: unknown };
+  } catch {
+    return errorResponse(400, "请求内容不是有效 JSON");
+  }
+
+  const normalized = normalizeDisplayBlockRule(body.type, body.value);
+  if (!normalized.ok) return errorResponse(400, normalized.error);
+  const result = await env.DB.prepare(
+    `INSERT OR IGNORE INTO display_block_rules(
+       type, value, normalized_value, created_by, created_at
+     ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+  )
+    .bind(
+      normalized.rule.type,
+      normalized.rule.value,
+      normalized.rule.normalizedValue,
+      adminEmail,
+    )
+    .run();
+  if ((result.meta.changes ?? 0) === 0) return errorResponse(409, "该屏蔽规则已存在");
+
+  const row = await env.DB.prepare(
+    `${DISPLAY_BLOCK_RULE_SELECT}
+     WHERE display_rule.type = ? AND display_rule.normalized_value = ?`,
+  )
+    .bind(normalized.rule.type, normalized.rule.normalizedValue)
+    .first<DisplayBlockRuleRow>();
+  return json(displayBlockRuleJson(row!), 201);
+}
+
+async function adminDisplayRule(
+  request: Request,
+  env: Env,
+  id: string,
+): Promise<Response> {
+  if (request.method !== "DELETE") return errorResponse(405, "Method not allowed");
+  if (!/^[1-9]\d{0,15}$/.test(id) || !Number.isSafeInteger(Number(id))) {
+    return errorResponse(400, "屏蔽规则 ID 无效");
+  }
+  const result = await env.DB.prepare("DELETE FROM display_block_rules WHERE id = ?")
+    .bind(Number(id))
+    .run();
+  if ((result.meta.changes ?? 0) === 0) return errorResponse(404, "屏蔽规则不存在");
+  return json({ ok: true });
+}
+
 async function adminMessages(request: Request, env: Env): Promise<Response> {
   if (request.method !== "GET") return errorResponse(405, "Method not allowed");
   const url = new URL(request.url);
@@ -1923,6 +2034,13 @@ async function adminApi(
   }
   try {
     if (path === "/api/admin/dashboard") return adminDashboard(request, env);
+    if (path === "/api/admin/display-rules") {
+      return adminDisplayRules(request, env, principal.email);
+    }
+    const displayRuleMatch = path.match(/^\/api\/admin\/display-rules\/([^/]+)$/);
+    if (displayRuleMatch) {
+      return adminDisplayRule(request, env, decodeURIComponent(displayRuleMatch[1]));
+    }
     if (path === "/api/admin/messages") return adminMessages(request, env);
     if (path === "/api/admin/messages/bulk") {
       return adminBulkMessages(request, env, principal.email, context);
